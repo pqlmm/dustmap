@@ -1113,6 +1113,17 @@ body {
 
 .btn-secondary:hover { background: rgba(244, 63, 94, 0.1); color: var(--accent-rose); border-color: rgba(244, 63, 94, 0.2); }
 
+.btn-outline {
+    background: transparent;
+    color: var(--accent-cyan);
+    border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.btn-outline:hover { 
+    background: rgba(34, 211, 238, 0.1); 
+    border-color: var(--accent-cyan); 
+    transform: translateY(-1px);
+}
 /* ===== Toast ===== */
 .toast-container {
     position: fixed;

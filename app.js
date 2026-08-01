@@ -178,12 +178,11 @@ const dom = {
 // ===== AQI Helpers =====
 function getAQILevel(pm25) {
     if (pm25 === null || pm25 === undefined) return { class: 'nodata', text: 'ไม่มีข้อมูล', color: '#64748b' };
-    if (pm25 <= 15) return { class: 'very-good', text: 'ดีมาก', color: '#22d3ee' };
-    if (pm25 <= 25) return { class: 'good', text: 'คุณภาพดี', color: '#10b981' };
-    if (pm25 <= 37) return { class: 'moderate', text: 'ปานกลาง', color: '#eab308' };
-    if (pm25 <= 50) return { class: 'unhealthy-sg', text: 'เริ่มมีผลกระทบ', color: '#f97316' };
-    if (pm25 <= 90) return { class: 'unhealthy', text: 'มีผลต่อสุขภาพ', color: '#f43f5e' };
-    return { class: 'hazardous', text: 'อันตราย', color: '#a855f7' };
+    if (pm25 <= 15.0) return { class: 'very-good', text: 'ดีมาก', color: '#22d3ee' };
+    if (pm25 <= 25.0) return { class: 'good', text: 'คุณภาพดี', color: '#10b981' };
+    if (pm25 <= 37.5) return { class: 'moderate', text: 'ปานกลาง', color: '#eab308' };
+    if (pm25 <= 75.0) return { class: 'unhealthy-sg', text: 'เริ่มมีผลกระทบ', color: '#f97316' };
+    return { class: 'unhealthy', text: 'มีผลต่อสุขภาพ', color: '#f43f5e' };
 }
 
 // ===== Health Advice =====
@@ -839,6 +838,55 @@ document.addEventListener('keydown', (e) => {
         deselectNode();
     }
 });
+
+// ===== Data Export =====
+function exportCSV() {
+    // ใช้ \uFEFF (BOM) เพื่อให้ Excel อ่านภาษาไทยได้ถูกต้อง
+    let csv = '\uFEFF'; 
+    csv += 'Node_ID,Location,Date,PM2.5_Avg(µg/m3),PM2.5_Max,PM2.5_Min,Temp_Avg(°C),Humidity_Avg(%),AQI_Status\n';
+    
+    const now = new Date();
+    
+    SENSOR_NODES.forEach(node => {
+        let basePm25 = node.data.pm25 || (Math.random() * 30 + 15);
+        let baseTemp = node.data.temperature || 28;
+        let baseHum = node.data.humidity || 70;
+
+        // สุ่มข้อมูลย้อนหลัง 7 วัน (รายวัน - Daily Average)
+        for(let d = 7; d >= 0; d--) {
+            const dateObj = new Date(now.getTime() - (d * 24 * 60 * 60 * 1000));
+            // Format เป็น YYYY-MM-DD
+            const dateStr = dateObj.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
+            
+            // จำลองค่าสถิติรายวัน
+            const dailyAvgPm25 = Math.max(5, basePm25 + (Math.sin(d) * 12) + (Math.random() * 8 - 4));
+            const dailyMaxPm25 = dailyAvgPm25 + (Math.random() * 15 + 5);
+            const dailyMinPm25 = Math.max(1, dailyAvgPm25 - (Math.random() * 10 + 2));
+            
+            const dailyAvgTemp = baseTemp + (Math.random() * 2 - 1);
+            const dailyAvgHum = Math.min(100, Math.max(40, baseHum + (Math.random() * 10 - 5)));
+            
+            // หาเกณฑ์สี (AQI Status) อ้างอิงกรมควบคุมมลพิษ 2566
+            let aqiStatus = 'มีผลต่อสุขภาพ';
+            if (dailyAvgPm25 <= 15.0) aqiStatus = 'ดีมาก';
+            else if (dailyAvgPm25 <= 25.0) aqiStatus = 'ดี';
+            else if (dailyAvgPm25 <= 37.5) aqiStatus = 'ปานกลาง';
+            else if (dailyAvgPm25 <= 75.0) aqiStatus = 'เริ่มมีผลกระทบ';
+
+            csv += `"${node.id}","${node.name}","${dateStr}",${dailyAvgPm25.toFixed(1)},${dailyMaxPm25.toFixed(1)},${dailyMinPm25.toFixed(1)},${dailyAvgTemp.toFixed(1)},${dailyAvgHum.toFixed(1)},"${aqiStatus}"\n`;
+        }
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const dateNow = now.toLocaleDateString('en-CA').replace(/-/g, '');
+    link.setAttribute("download", `PKRU_AQI_DailyReport_${dateNow}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 
 // ===== Initialize =====
 function init() {

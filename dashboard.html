@@ -125,13 +125,17 @@
                 ระดับคุณภาพอากาศ (PM2.5)
             </h3>
             <div class="legend-items">
-                <div class="legend-item"><span class="legend-color" style="background:#22d3ee"></span><span>ดีมาก (0–15)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>ดี (16–25)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#eab308"></span><span>ปานกลาง (26–37)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#f97316"></span><span>เริ่มมีผล (38–50)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>มีผลต่อสุขภาพ (51–90)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#a855f7"></span><span>อันตราย (91+)</span></div>
+                <div class="legend-item"><span class="legend-color" style="background:#22d3ee"></span><span>ดีมาก (0–15.0)</span></div>
+                <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>ดี (15.1–25.0)</span></div>
+                <div class="legend-item"><span class="legend-color" style="background:#eab308"></span><span>ปานกลาง (25.1–37.5)</span></div>
+                <div class="legend-item"><span class="legend-color" style="background:#f97316"></span><span>เริ่มมีผลกระทบ (37.6–75.0)</span></div>
+                <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>มีผลต่อสุขภาพ (>75.0)</span></div>
             </div>
+            
+            <button class="btn btn-outline" style="width: 100%; margin-top: 20px; font-size: 0.8rem;" onclick="exportCSV()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                ดาวน์โหลดข้อมูล (CSV)
+            </button>
         </div>
     </aside>
 

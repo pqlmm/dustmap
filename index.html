@@ -174,10 +174,10 @@
                     </div>
                     <h3>เทคโนโลยีที่ใช้</h3>
                     <ul>
-                        <li><strong>เซ็นเซอร์:</strong> PMS5003 (PM2.5) + DHT22 (อุณหภูมิ/ความชื้น)</li>
+                        <li><strong>เซ็นเซอร์:</strong> PMS7003 (PM2.5) + DHT22 (อุณหภูมิ/ความชื้น)</li>
                         <li><strong>ไมโครคอนโทรลเลอร์:</strong> ESP32 พร้อม WiFi</li>
                         <li><strong>โปรโตคอล:</strong> MQTT สำหรับส่งข้อมูลแบบเรียลไทม์</li>
-                        <li><strong>แสดงผล:</strong> Web Application + Leaflet Map</li>
+                        <li><strong>มาตรฐาน:</strong> อ้างอิงเกณฑ์ PM2.5 กรมควบคุมมลพิษ 2566</li>
                     </ul>
                 </div>
                 <div class="about-card reveal-item">
@@ -342,12 +342,11 @@
     <script>
         // ===== PM2.5 Quick View Simulation =====
         function getAQILevel(pm25) {
-            if (pm25 <= 15) return { text: 'อากาศดีมาก 😊', color: '#22d3ee', icon: '😊', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
-            if (pm25 <= 25) return { text: 'อากาศดี 🙂', color: '#10b981', icon: '🙂', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
-            if (pm25 <= 37) return { text: 'ควรระวัง 😐', color: '#eab308', icon: '😐', advice: 'ผู้มีโรคประจำตัวควรระวัง' };
-            if (pm25 <= 50) return { text: 'สวมหน้ากาก 😷', color: '#f97316', icon: '😷', advice: 'ควรสวมหน้ากากอนามัย' };
-            if (pm25 <= 90) return { text: 'งดกิจกรรมกลางแจ้ง 🚫', color: '#f43f5e', icon: '🚫', advice: 'งดกิจกรรมกลางแจ้ง สวม N95' };
-            return { text: 'อันตราย! ⚠️', color: '#a855f7', icon: '⚠️', advice: 'อยู่ในอาคาร ปิดหน้าต่าง' };
+            if (pm25 <= 15.0) return { text: 'อากาศดีมาก 😊', color: '#22d3ee', icon: '😊', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
+            if (pm25 <= 25.0) return { text: 'อากาศดี 🙂', color: '#10b981', icon: '🙂', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
+            if (pm25 <= 37.5) return { text: 'ปานกลาง 😐', color: '#eab308', icon: '😐', advice: 'ผู้มีโรคประจำตัวควรระวัง' };
+            if (pm25 <= 75.0) return { text: 'เริ่มมีผลกระทบ 😷', color: '#f97316', icon: '😷', advice: 'ควรสวมหน้ากากอนามัย' };
+            return { text: 'มีผลกระทบ ⚠️', color: '#f43f5e', icon: '⚠️', advice: 'งดกิจกรรมกลางแจ้ง ปิดหน้าต่าง' };
         }
 
         function updatePM25Display(pm25) {
