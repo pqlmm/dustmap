@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="ระบบตรวจวัดคุณภาพอากาศ มหาวิทยาลัยราชภัฏภูเก็ต — PM2.5, อุณหภูมิ, ความชื้น แบบเรียลไทม์">
     <title>PKRU Air Quality — ระบบตรวจวัดคุณภาพอากาศ มรภ.ภูเก็ต</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,7 +62,10 @@
                     <div class="pm25-center"><span class="pm25-value" id="pm25Value">--</span><span class="pm25-unit">μg/m³</span><span class="pm25-label">ค่าเฉลี่ย PM2.5</span></div>
                 </div>
                 <div class="pm25-status" id="pm25Status"><span class="status-icon" id="statusIcon"></span><span class="status-text" id="statusText">กำลังโหลดข้อมูล...</span></div>
-                <div class="live-card-footer"><span>มาตรฐาน PM2.5</span><strong>ดูรายละเอียดทั้งหมด →</strong></div>
+                <div class="live-card-footer">
+                    <a href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer">มาตรฐาน PM2.5 <span>↗</span></a>
+                    <a href="dashboard.html">ดูรายละเอียดทั้งหมด →</a>
+                </div>
             </aside>
         </div>
 

@@ -357,6 +357,10 @@ body {
     margin-bottom: 12px;
 }
 
+.pm-standard-link { color: inherit; text-decoration: none; cursor: pointer; pointer-events: auto; position: relative; z-index: 1; width: fit-content; }
+.pm-standard-link span { color: var(--accent-cyan); font-size: .85em; }
+.pm-standard-link:hover { color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ===== Overview Section ===== */
 .overview-section {
     padding: 12px 0 8px;

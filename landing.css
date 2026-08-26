@@ -492,7 +492,7 @@ a { color: inherit; text-decoration: none; }
 
 .aqi-bar {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     border-radius: 12px;
     overflow: hidden;
@@ -1049,7 +1049,10 @@ a { color: inherit; text-decoration: none; }
 .hero-live-card .pm25-value { font-size: 3.4rem; }
 .hero-live-card .pm25-status { justify-content: center; border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,.035); }
 .live-card-footer { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(148,163,184,.12); }
-.live-card-footer strong { color: var(--accent-cyan); font-size: .68rem; }
+.live-card-footer a { color: var(--text-muted); text-decoration: none; font-size: .68rem; }
+.live-card-footer a:first-child:hover { color: #cbd5e1; }
+.live-card-footer a:last-child { color: var(--accent-cyan); font-weight: 700; }
+.live-card-footer a:last-child:hover { color: #67e8f9; }
 
 @media (max-width: 768px) {
     .nav {
