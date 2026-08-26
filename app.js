@@ -5,57 +5,44 @@
  */
 
 // ===== Sensor Node Definitions =====
-// จุดติดตั้งเซ็นเซอร์ — ตึกแต่ละคณะ + โรงอาหาร มรภ.ภูเก็ต
+// จุดติดตั้งเซ็นเซอร์ภายใน มรภ.ภูเก็ต
 const SENSOR_NODES = [
-    {
-        id: 'node1',
-        name: 'คณะครุศาสตร์',
-        description: 'Faculty of Education',
-        lat: 7.916100048652821,
-        lng: 98.38862850729211,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
-    },
     {
         id: 'node2',
         name: 'คณะวิทยาศาสตร์และเทคโนโลยี',
         description: 'Faculty of Science & Technology',
-        lat: 7.91534555945768,
-        lng: 98.38866069379964,
+        lat: 7.914588491091475,
+        lng: 98.38881665269558,
         data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
     },
     {
         id: 'node3',
         name: 'คณะมนุษยศาสตร์และสังคมศาสตร์',
         description: 'Faculty of Humanities & Social Sciences',
-        lat: 7.908968819708348,
-        lng: 98.38660452173964,
+        lat: 7.9090528204855755,
+        lng: 98.38655930865212,
         data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
     },
     {
         id: 'node4',
         name: 'คณะวิทยาการจัดการ',
         description: 'Faculty of Management Sciences',
-        lat: 7.9134115104068465,
-        lng: 98.38730886046267,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
-    },
-    {
-        id: 'node5',
-        name: 'คณะเทคโนโลยีการเกษตร',
-        description: 'Faculty of Agricultural Technology',
-        lat: 7.914739841780236,
-        lng: 98.38769509857339,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
-    },
-    {
-        id: 'node6',
-        name: 'โรงอาหาร',
-        description: 'โรงอาหารกลาง มรภ.ภูเก็ต',
-        lat: 7.910499793035807,
-        lng: 98.38669731681406,
+        lat: 7.913082581293544,
+        lng: 98.38724860930434,
         data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
     }
 ];
+
+// ไอคอนช่วยแยกประเภทคณะเมื่อมองบนแผนที่
+const FACULTY_ICONS = {
+    node2: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="คณะวิทยาศาสตร์"><ellipse cx="12" cy="12" rx="9" ry="3.8"/><ellipse cx="12" cy="12" rx="9" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.8" transform="rotate(120 12 12)"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/></svg>',
+    node3: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="คณะมนุษยศาสตร์"><path d="M4 5.5c2.8-1.3 5.3-.8 8 1.1v12c-2.7-1.9-5.2-2.4-8-1.1z"/><path d="M20 5.5c-2.8-1.3-5.3-.8-8 1.1v12c2.7-1.9 5.2-2.4 8-1.1z"/><path d="M8 10h2M14 10h2"/></svg>',
+    node4: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="คณะวิทยาการจัดการ"><path d="M4 19V10M10 19V5M16 19v-7M22 19V8"/><path d="m4 7 5-3 5 3 6-5"/><path d="M17 2h3v3"/></svg>',
+};
+
+function getFacultyIcon(nodeId) {
+    return FACULTY_ICONS[nodeId] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/></svg>';
+}
 
 // ===== Simulation =====
 let simulationInterval = null;
@@ -128,6 +115,8 @@ const state = {
     markers: {},
     selectedNodeId: null,
     theme: 'dark',
+    historyRange: 1,
+    overviewHistoryRange: 1,
     discordLastAlert: {},  // { nodeId: timestamp } cooldown tracker
 };
 
@@ -150,6 +139,9 @@ const dom = {
     globalTimestamp: document.getElementById('globalTimestamp'),
     globalTimestampText: document.getElementById('globalTimestampText'),
     globalTimestampDot: document.getElementById('globalTimestampDot'),
+    // Campus-wide historical chart
+    overviewChart: document.getElementById('overviewChart'),
+    overviewChartEmpty: document.getElementById('overviewChartEmpty'),
     // Detail health advisory
     detailHealthIcon: document.getElementById('detailHealthIcon'),
     detailHealthText: document.getElementById('detailHealthText'),
@@ -171,6 +163,12 @@ const dom = {
     detailTempStatus: document.getElementById('detailTempStatus'),
     detailHumStatus: document.getElementById('detailHumStatus'),
     detailUpdate: document.getElementById('detailUpdate'),
+    // History chart
+    historyChart: document.getElementById('historyChart'),
+    historyEmpty: document.getElementById('historyEmpty'),
+    historySummary: document.getElementById('historySummary'),
+    historyRangeLabel: document.getElementById('historyRangeLabel'),
+    historyDownload: document.getElementById('historyDownload'),
     // Toast
     toastContainer: document.getElementById('toastContainer'),
 };
@@ -179,21 +177,38 @@ const dom = {
 function getAQILevel(pm25) {
     if (pm25 === null || pm25 === undefined) return { class: 'nodata', text: 'ไม่มีข้อมูล', color: '#64748b' };
     if (pm25 <= 15.0) return { class: 'very-good', text: 'ดีมาก', color: '#22d3ee' };
-    if (pm25 <= 25.0) return { class: 'good', text: 'คุณภาพดี', color: '#10b981' };
+    if (pm25 <= 25.0) return { class: 'good', text: 'ดี', color: '#10b981' };
     if (pm25 <= 37.5) return { class: 'moderate', text: 'ปานกลาง', color: '#eab308' };
     if (pm25 <= 75.0) return { class: 'unhealthy-sg', text: 'เริ่มมีผลกระทบ', color: '#f97316' };
     return { class: 'unhealthy', text: 'มีผลต่อสุขภาพ', color: '#f43f5e' };
 }
 
-// ===== Health Advice =====
+// ===== Health Advice (เกณฑ์ กรมควบคุมมลพิษ 2566) =====
 function getHealthAdvice(pm25) {
-    if (pm25 === null || pm25 === undefined) return { icon: '—', text: 'รอข้อมูล', sub: '', class: 'nodata' };
-    if (pm25 <= 15) return { icon: '😊', text: 'อากาศดีมาก', sub: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ', class: 'very-good' };
-    if (pm25 <= 25) return { icon: '🙂', text: 'อากาศดี', sub: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ', class: 'good' };
-    if (pm25 <= 37) return { icon: '😐', text: 'ควรระวัง', sub: 'ผู้ที่มีโรคประจำตัวควรลดกิจกรรมกลางแจ้ง', class: 'moderate' };
-    if (pm25 <= 50) return { icon: '😷', text: 'สวมหน้ากากอนามัย', sub: 'ควรสวมหน้ากาก ลดกิจกรรมกลางแจ้ง', class: 'unhealthy-sg' };
-    if (pm25 <= 90) return { icon: '🚫', text: 'งดกิจกรรมกลางแจ้ง', sub: 'สวมหน้ากาก N95 หากต้องออกนอกอาคาร', class: 'unhealthy' };
-    return { icon: '⚠️', text: 'อันตราย!', sub: 'อยู่ในอาคาร ปิดหน้าต่าง เปิดเครื่องฟอกอากาศ', class: 'hazardous' };
+    if (pm25 === null || pm25 === undefined) return { text: 'รอข้อมูล', sub: '', class: 'nodata' };
+    if (pm25 <= 15.0) return { text: 'อากาศดีมาก', sub: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ', class: 'very-good' };
+    if (pm25 <= 25.0) return { text: 'อากาศดี', sub: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ', class: 'good' };
+    if (pm25 <= 37.5) return { text: 'ปานกลาง', sub: 'ผู้ที่มีโรคประจำตัวควรลดกิจกรรมกลางแจ้ง', class: 'moderate' };
+    if (pm25 <= 75.0) return { text: 'เริ่มมีผลกระทบ', sub: 'ควรสวมหน้ากาก ลดกิจกรรมกลางแจ้ง', class: 'unhealthy-sg' };
+    return { text: 'มีผลต่อสุขภาพ', sub: 'งดกิจกรรมกลางแจ้ง สวมหน้ากาก N95', class: 'unhealthy' };
+}
+
+function getHealthFaceIcon(level) {
+    const head = '<path d="M7.7 14.2c.2-5.7 3.2-9.7 8.3-9.7 5.2 0 8.2 4 8.3 9.7v4.2c0 5.7-3.4 9.6-8.3 9.6s-8.3-3.9-8.3-9.6z"/><path d="M8 13.2c.3-2.5 1.1-5 3.4-6.5 2.5 1.3 5.5 1.8 8.6 1.3M22.7 7.9c1.1 1.4 1.5 3 1.4 5"/><path d="M5.8 15.3c-1.1.4-1.2 4.4 1.6 4.4M26.2 15.3c1.1.4 1.2 4.4-1.6 4.4"/>';
+    const faces = {
+        'very-good': `${head}<path d="M11.8 16.1h.1M20.1 16.1h.1M12.4 21.2c2 2.2 5.2 2.2 7.2 0"/>`,
+        good: `${head}<path d="M12.2 16.1h.1M19.7 16.1h.1M13 22c1.7 1.1 4.3 1.1 6 0"/>`,
+        moderate: `${head}<path d="M12.2 16.1h.1M19.7 16.1h.1M13 22h6"/>`,
+        'unhealthy-sg': `${head}<path d="M12.2 15.7h.1M19.7 15.7h.1"/><path d="M8.2 18.1 11 17l5 1.1 5-1.1 2.8 1.1M10.7 18.3v5.5c3.3 2.1 7.3 2.1 10.6 0v-5.5"/><path d="M13 20.5h6M13 22.3h6"/>`,
+        unhealthy: `${head}<path d="M11.6 15.8h.1M20.2 15.8h.1"/><path d="M7.5 18.2 10.8 17l5.2 1.1 5.2-1.1 3.3 1.2M10.4 18.4v5.8c3.5 2.3 7.7 2.3 11.2 0v-5.8"/><path d="M12.3 20.6h7.4M12.3 22.5h7.4M16 19.4v5.6"/>`,
+        nodata: '<circle cx="16" cy="16" r="10"/><path d="M13.4 12.8a2.8 2.8 0 0 1 5.2 1.4c0 2-2.6 2.1-2.6 4M16 22h.1"/>',
+    };
+    const face = faces[level] || faces.nodata;
+    return `<span class="health-face health-face-${level}" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">${face}</svg></span>`;
+}
+
+function setHealthIcon(element, advice) {
+    if (element) element.innerHTML = getHealthFaceIcon(advice.class);
 }
 
 function getTempStatus(temp) {
@@ -243,12 +258,9 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', state.theme);
     localStorage.setItem('pkru_aqm_theme', state.theme);
     
-    // Switch map tiles
+    // OpenStreetMap tiles do not require an API key; keep the same source in both UI themes.
     if (state.tileLayer) {
-        const tileUrl = state.theme === 'light' 
-            ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-        state.tileLayer.setUrl(tileUrl);
+        state.tileLayer.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
     }
 }
 
@@ -291,14 +303,11 @@ function initMap() {
     });
     new SidebarToggleControl().addTo(state.map);
 
-    // Set map tiles based on theme
-    const tileUrl = state.theme === 'light' 
-        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    // OpenStreetMap public tiles — no API key needed
+    const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
         
     state.tileLayer = L.tileLayer(tileUrl, {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 20
     }).addTo(state.map);
 
@@ -317,13 +326,12 @@ function initMap() {
 function createMarker(node) {
     const aqi = getAQILevel(node.data.pm25);
     const markerClass = `marker-${aqi.class}`;
-    const pm25Display = node.data.pm25 !== null ? Math.round(node.data.pm25) : '—';
 
     const icon = L.divIcon({
         className: `custom-marker ${markerClass}`,
         html: `
             <div class="marker-outer">
-                <div class="marker-inner">${pm25Display}</div>
+                <div class="marker-inner">${getFacultyIcon(node.id)}</div>
                 <span class="marker-label">${node.name}</span>
             </div>
         `,
@@ -385,14 +393,13 @@ function updateMarker(nodeId) {
 
     const aqi = getAQILevel(node.data.pm25);
     const markerClass = `marker-${aqi.class}`;
-    const pm25Display = node.data.pm25 !== null ? Math.round(node.data.pm25) : '—';
     const isActive = state.selectedNodeId === nodeId;
 
     const icon = L.divIcon({
         className: `custom-marker ${markerClass} ${isActive ? 'marker-active' : ''}`,
         html: `
             <div class="marker-outer">
-                <div class="marker-inner">${pm25Display}</div>
+                <div class="marker-inner">${getFacultyIcon(node.id)}</div>
                 <span class="marker-label">${node.name}</span>
             </div>
         `,
@@ -420,6 +427,7 @@ function selectNode(nodeId) {
     state.selectedNodeId = nodeId;
     updateMarker(nodeId);
     updateDetailPanel(node);
+    renderHistoryChart();
     updateNodeList();
 
     // Pan to marker
@@ -456,7 +464,7 @@ function updateDetailPanel(node) {
     dom.detailNodeName.textContent = node.name;
     dom.detailNodeLocation.textContent = node.description;
     dom.detailMarkerIcon.style.background = `linear-gradient(135deg, ${aqi.color}, ${aqi.color}dd)`;
-    dom.detailMarkerIcon.textContent = node.id.replace('node', '#');
+    dom.detailMarkerIcon.innerHTML = getFacultyIcon(node.id);
 
     // PM2.5 — dynamic color
     const pm25 = node.data.pm25;
@@ -479,7 +487,7 @@ function updateDetailPanel(node) {
     dom.detailHumStatus.textContent = getHumStatus(hum);
 
     // Detail health advisory
-    if (dom.detailHealthIcon) dom.detailHealthIcon.textContent = advice.icon;
+    setHealthIcon(dom.detailHealthIcon, advice);
     if (dom.detailHealthText) dom.detailHealthText.textContent = `${advice.text} — ${advice.sub}`;
 
     // Last update
@@ -505,8 +513,8 @@ function buildNodeList() {
         const hum = node.data.humidity !== null ? node.data.humidity.toFixed(1) : '--';
 
         el.innerHTML = `
-            <div class="node-marker" style="background:${aqi.color}; color:${aqi.color}">
-                ${node.id.replace('node', '')}
+            <div class="node-marker" style="background:${aqi.color}">
+                ${getFacultyIcon(node.id)}
             </div>
             <div class="node-info">
                 <div class="node-name">${node.name}</div>
@@ -535,7 +543,7 @@ function updateNodeList() {
 
         const marker = item.querySelector('.node-marker');
         marker.style.background = aqi.color;
-        marker.style.color = aqi.color;
+        marker.style.color = '#fff';
 
         const pm25 = node.data.pm25 !== null ? node.data.pm25.toFixed(1) : '--';
         const temp = node.data.temperature !== null ? node.data.temperature.toFixed(1) : '--';
@@ -567,7 +575,7 @@ function updateOverview() {
         setTimeout(() => dom.avgPM25.classList.remove('value-update'), 500);
 
         // Update sidebar health advisory
-        if (dom.healthIcon) dom.healthIcon.textContent = advice.icon;
+        setHealthIcon(dom.healthIcon, advice);
         if (dom.healthText) dom.healthText.textContent = advice.text;
         if (dom.healthSub) dom.healthSub.textContent = advice.sub;
         if (dom.healthAdvisory) {
@@ -673,7 +681,7 @@ function connectMQTT() {
     showToast(`กำลังเชื่อมต่อ ${config.host}...`, 'info');
 
     const options = {
-        clientId: 'pkru_aqm_' + Math.random().toString(16).substr(2, 8),
+        clientId: 'pkru_aqm_' + Math.random().toString(16).substring(2, 10),
         clean: true,
         connectTimeout: 10000,
         reconnectPeriod: 5000,
@@ -716,7 +724,6 @@ function connectMQTT() {
         // {prefix}/{nodeId} → JSON with all data e.g. sensor/node1 → {"pm25":25,"temperature":32,"humidity":65}
 
         if (parts.length >= 2) {
-            const nodeId = parts.length >= 2 ? parts[parts.length === 2 ? 1 : parts.length - 2] : null;
             // Check if topic matches pattern with 3 parts
             if (parts.length >= 3) {
                 const dataType = parts[parts.length - 1]; // pm25, temperature, humidity
@@ -769,7 +776,7 @@ function connectMQTT() {
     });
 
     state.client.on('reconnect', () => {
-        setConnectionStatus('connecting');
+        showToast('กำลังเชื่อมต่อใหม่...', 'info');
     });
 }
 
@@ -778,9 +785,154 @@ function disconnectMQTT() {
         state.client.end(true);
         state.client = null;
         state.connected = false;
-        setConnectionStatus('');
         showToast('ตัดการเชื่อมต่อ — กลับสู่โหมดจำลอง', 'info');
         startSimulation();
+    }
+}
+
+// ===== Historical data =====
+// เก็บค่าในเบราว์เซอร์เพื่อให้กราฟและ CSV แสดงข้อมูลที่ได้รับจริง
+const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v1';
+const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function loadHistory() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
+        return Array.isArray(saved) ? saved : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveHistory(rows) {
+    try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(rows)); } catch { /* Storage unavailable */ }
+}
+
+function recordHistory(node) {
+    if (!node || node.data.pm25 === null || node.data.temperature === null || node.data.humidity === null) return;
+    const now = Date.now();
+    const rows = loadHistory().filter(row => now - new Date(row.timestamp).getTime() <= HISTORY_RETENTION_MS);
+    const last = rows[rows.length - 1];
+
+    // รวมค่าที่เข้ามาในช่วง 20 วินาทีเดียวกันเป็นหนึ่งจุด เพื่อให้กราฟอ่านง่าย
+    if (last && last.nodeId === node.id && now - new Date(last.timestamp).getTime() < 20000) {
+        last.timestamp = new Date(now).toISOString();
+        last.pm25 = node.data.pm25;
+        last.temperature = node.data.temperature;
+        last.humidity = node.data.humidity;
+    } else {
+        rows.push({
+            nodeId: node.id,
+            timestamp: new Date(now).toISOString(),
+            pm25: node.data.pm25,
+            temperature: node.data.temperature,
+            humidity: node.data.humidity,
+        });
+    }
+    saveHistory(rows);
+}
+
+function getHistoryRows(nodeId, days = state.historyRange) {
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return loadHistory()
+        .filter(row => row.nodeId === nodeId && new Date(row.timestamp).getTime() >= cutoff)
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+}
+
+function getOverviewHistoryRows(days = state.overviewHistoryRange) {
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const buckets = new Map();
+    loadHistory().filter(row => new Date(row.timestamp).getTime() >= cutoff).forEach(row => {
+        const bucket = Math.floor(new Date(row.timestamp).getTime() / 20000) * 20000;
+        const values = buckets.get(bucket) || [];
+        values.push(row);
+        buckets.set(bucket, values);
+    });
+    return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([timestamp, rows]) => ({
+        timestamp: new Date(timestamp).toISOString(),
+        pm25: rows.reduce((total, row) => total + Number(row.pm25), 0) / rows.length,
+        temperature: rows.reduce((total, row) => total + Number(row.temperature), 0) / rows.length,
+        humidity: rows.reduce((total, row) => total + Number(row.humidity), 0) / rows.length,
+    }));
+}
+
+function renderOverviewChart() {
+    if (!dom.overviewChart) return;
+    const rows = getOverviewHistoryRows();
+    if (dom.overviewChartEmpty) dom.overviewChartEmpty.classList.toggle('visible', rows.length < 2);
+    if (!rows.length) {
+        dom.overviewChart.innerHTML = '';
+        return;
+    }
+
+    const metrics = [
+        { key: 'pm25', color: '#818cf8' },
+        { key: 'temperature', color: '#f97316' },
+        { key: 'humidity', color: '#22d3ee' },
+    ];
+    const sampleStep = Math.max(1, Math.ceil(rows.length / 60));
+    const points = rows.filter((_, index) => index % sampleStep === 0 || index === rows.length - 1);
+    const upper = Math.max(100, Math.ceil(Math.max(...metrics.flatMap(metric => points.map(row => Number(row[metric.key])))) / 10) * 10);
+    const left = 6, right = 6, top = 7, bottom = 7, width = 290 - left - right, height = 120 - top - bottom;
+    const x = index => left + (points.length === 1 ? width / 2 : index / (points.length - 1) * width);
+    const y = value => top + (upper - Math.max(0, value)) / upper * height;
+    const grid = [.25, .5, .75].map(position => `<line x1="${left}" y1="${top + height * position}" x2="${left + width}" y2="${top + height * position}" stroke="rgba(148,163,184,.13)" stroke-dasharray="2 3"/>`).join('');
+    const lines = metrics.map(metric => {
+        const line = points.map((row, index) => `${x(index).toFixed(1)},${y(Number(row[metric.key])).toFixed(1)}`).join(' ');
+        return `<polyline points="${line}" fill="none" stroke="${metric.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join('');
+    dom.overviewChart.innerHTML = `${grid}${lines}`;
+}
+
+function renderHistoryChart() {
+    if (!dom.historyChart || !state.selectedNodeId) return;
+    const metrics = [
+        { key: 'pm25', label: 'PM2.5', unit: 'μg/m³', color: '#818cf8' },
+        { key: 'temperature', label: 'อุณหภูมิ', unit: '°C', color: '#f97316' },
+        { key: 'humidity', label: 'ความชื้น', unit: '%RH', color: '#22d3ee' },
+    ];
+    const rows = getHistoryRows(state.selectedNodeId);
+    const rangeText = `ย้อนหลัง ${state.historyRange} วัน`;
+    if (dom.historyRangeLabel) dom.historyRangeLabel.textContent = rangeText;
+    if (dom.historyEmpty) dom.historyEmpty.classList.toggle('visible', rows.length < 2);
+
+    if (rows.length === 0) {
+        dom.historyChart.innerHTML = '';
+        if (dom.historySummary) dom.historySummary.textContent = 'ยังไม่มีข้อมูลบันทึก';
+        return;
+    }
+
+    // ลดจำนวนจุดที่วาดเพื่อรักษาความลื่นไหลบนช่วง 30 วัน
+    const maxPoints = 90;
+    const step = Math.max(1, Math.ceil(rows.length / maxPoints));
+    const points = rows.filter((_, index) => index % step === 0 || index === rows.length - 1);
+    const values = metrics.flatMap(metric => points.map(row => Number(row[metric.key]))).filter(Number.isFinite);
+    const upper = Math.max(100, Math.ceil(Math.max(...values) / 10) * 10);
+    const left = 36, right = 10, top = 12, bottom = 28, width = 580 - left - right, height = 180 - top - bottom;
+    const x = index => left + (points.length === 1 ? width / 2 : index / (points.length - 1) * width);
+    const y = value => top + (upper - Math.max(0, value)) / upper * height;
+    const grid = [0, .5, 1].map(position => {
+        const value = upper - upper * position;
+        const gridY = top + height * position;
+        return `<line x1="${left}" y1="${gridY}" x2="${left + width}" y2="${gridY}" stroke="rgba(148,163,184,.18)" stroke-dasharray="3 4"/><text x="0" y="${gridY + 4}" fill="#64748b" font-size="10">${value.toFixed(0)}</text>`;
+    }).join('');
+    const labels = [points[0], points[points.length - 1]].map((row, index) => {
+        const date = new Date(row.timestamp);
+        const text = state.historyRange === 1
+            ? date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+            : date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        return `<text x="${index === 0 ? left : left + width}" y="174" text-anchor="${index === 0 ? 'start' : 'end'}" fill="#64748b" font-size="10">${text}</text>`;
+    }).join('');
+    const lines = metrics.map(metric => {
+        const line = points.map((row, index) => `${x(index).toFixed(1)},${y(Number(row[metric.key])).toFixed(1)}`).join(' ');
+        const dots = points.map((row, index) => `<circle cx="${x(index)}" cy="${y(Number(row[metric.key]))}" r="${points.length === 1 ? 4 : 2}" fill="${metric.color}"><title>${metric.label} · ${new Date(row.timestamp).toLocaleString('th-TH')}: ${Number(row[metric.key]).toFixed(1)} ${metric.unit}</title></circle>`).join('');
+        return `<polyline points="${line}" fill="none" stroke="${metric.color}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+    }).join('');
+
+    dom.historyChart.innerHTML = `${grid}${lines}${labels}`;
+    if (dom.historySummary) {
+        const latest = points[points.length - 1];
+        dom.historySummary.textContent = `ล่าสุด: PM2.5 ${Number(latest.pm25).toFixed(1)} · ${Number(latest.temperature).toFixed(1)}°C · ${Number(latest.humidity).toFixed(1)}%RH`;
     }
 }
 
@@ -799,18 +951,21 @@ function onNodeDataUpdate(nodeId) {
 
     // Discord alert check
     const node = SENSOR_NODES.find(n => n.id === nodeId);
+    recordHistory(node);
+    renderOverviewChart();
     if (node && node.data.pm25 !== null) {
         sendDiscordAlert(node, node.data.pm25);
     }
+
+    if (state.selectedNodeId === nodeId) renderHistoryChart();
 }
 
 // ===== Event Listeners =====
-// Event Listeners
 if (dom.themeToggle) {
     dom.themeToggle.addEventListener('click', toggleTheme);
 }
 
-dom.sidebarToggle.addEventListener('click', () => {
+if (dom.sidebarToggle) dom.sidebarToggle.addEventListener('click', () => {
     if (window.innerWidth <= 768) {
         dom.sidebar.classList.toggle('open');
     } else {
@@ -825,13 +980,31 @@ dom.sidebarToggle.addEventListener('click', () => {
     }
 });
 
-dom.mobileToggle.addEventListener('click', () => {
+if (dom.mobileToggle) dom.mobileToggle.addEventListener('click', () => {
     dom.sidebar.classList.toggle('open');
 });
 
-dom.detailClose.addEventListener('click', () => {
+if (dom.detailClose) dom.detailClose.addEventListener('click', () => {
     deselectNode();
 });
+
+document.querySelectorAll('[data-history-range]').forEach(button => {
+    button.addEventListener('click', () => {
+        state.historyRange = Number(button.dataset.historyRange);
+        document.querySelectorAll('[data-history-range]').forEach(tab => tab.classList.toggle('active', tab === button));
+        renderHistoryChart();
+    });
+});
+
+document.querySelectorAll('[data-overview-range]').forEach(button => {
+    button.addEventListener('click', () => {
+        state.overviewHistoryRange = Number(button.dataset.overviewRange);
+        document.querySelectorAll('[data-overview-range]').forEach(tab => tab.classList.toggle('active', tab === button));
+        renderOverviewChart();
+    });
+});
+
+if (dom.historyDownload) dom.historyDownload.addEventListener('click', exportCSV);
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && dom.detailPanel.classList.contains('active')) {
@@ -841,51 +1014,33 @@ document.addEventListener('keydown', (e) => {
 
 // ===== Data Export =====
 function exportCSV() {
-    // ใช้ \uFEFF (BOM) เพื่อให้ Excel อ่านภาษาไทยได้ถูกต้อง
-    let csv = '\uFEFF'; 
-    csv += 'Node_ID,Location,Date,PM2.5_Avg(µg/m3),PM2.5_Max,PM2.5_Min,Temp_Avg(°C),Humidity_Avg(%),AQI_Status\n';
-    
-    const now = new Date();
-    
-    SENSOR_NODES.forEach(node => {
-        let basePm25 = node.data.pm25 || (Math.random() * 30 + 15);
-        let baseTemp = node.data.temperature || 28;
-        let baseHum = node.data.humidity || 70;
-
-        // สุ่มข้อมูลย้อนหลัง 7 วัน (รายวัน - Daily Average)
-        for(let d = 7; d >= 0; d--) {
-            const dateObj = new Date(now.getTime() - (d * 24 * 60 * 60 * 1000));
-            // Format เป็น YYYY-MM-DD
-            const dateStr = dateObj.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
-            
-            // จำลองค่าสถิติรายวัน
-            const dailyAvgPm25 = Math.max(5, basePm25 + (Math.sin(d) * 12) + (Math.random() * 8 - 4));
-            const dailyMaxPm25 = dailyAvgPm25 + (Math.random() * 15 + 5);
-            const dailyMinPm25 = Math.max(1, dailyAvgPm25 - (Math.random() * 10 + 2));
-            
-            const dailyAvgTemp = baseTemp + (Math.random() * 2 - 1);
-            const dailyAvgHum = Math.min(100, Math.max(40, baseHum + (Math.random() * 10 - 5)));
-            
-            // หาเกณฑ์สี (AQI Status) อ้างอิงกรมควบคุมมลพิษ 2566
-            let aqiStatus = 'มีผลต่อสุขภาพ';
-            if (dailyAvgPm25 <= 15.0) aqiStatus = 'ดีมาก';
-            else if (dailyAvgPm25 <= 25.0) aqiStatus = 'ดี';
-            else if (dailyAvgPm25 <= 37.5) aqiStatus = 'ปานกลาง';
-            else if (dailyAvgPm25 <= 75.0) aqiStatus = 'เริ่มมีผลกระทบ';
-
-            csv += `"${node.id}","${node.name}","${dateStr}",${dailyAvgPm25.toFixed(1)},${dailyMaxPm25.toFixed(1)},${dailyMinPm25.toFixed(1)},${dailyAvgTemp.toFixed(1)},${dailyAvgHum.toFixed(1)},"${aqiStatus}"\n`;
-        }
+    const selected = state.selectedNodeId;
+    const rows = selected
+        ? getHistoryRows(selected)
+        : loadHistory().filter(row => new Date(row.timestamp).getTime() >= Date.now() - state.historyRange * 86400000);
+    if (!rows.length) {
+        showToast('ยังไม่มีข้อมูลย้อนหลังสำหรับดาวน์โหลด', 'warning');
+        return;
+    }
+    const csvEscape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    let csv = '\uFEFFTimestamp,Node_ID,Location,PM2.5(µg/m3),Temperature(°C),Humidity(%RH),AQI_Status\n';
+    rows.forEach(row => {
+        const node = SENSOR_NODES.find(item => item.id === row.nodeId);
+        const aqi = getAQILevel(Number(row.pm25));
+        csv += [row.timestamp, row.nodeId, node ? node.name : row.nodeId, Number(row.pm25).toFixed(1), Number(row.temperature).toFixed(1), Number(row.humidity).toFixed(1), aqi.text].map(csvEscape).join(',') + '\n';
     });
-    
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    const dateNow = now.toLocaleDateString('en-CA').replace(/-/g, '');
-    link.setAttribute("download", `PKRU_AQI_DailyReport_${dateNow}.csv`);
+    const dateNow = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const scope = selected || 'all-nodes';
+    link.setAttribute("download", `PKRU_AQI_${scope}_${state.historyRange}days_${dateNow}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`ดาวน์โหลด CSV ย้อนหลัง ${state.historyRange} วันแล้ว`, 'success');
 }
 
 // ===== Initialize =====
@@ -894,13 +1049,14 @@ function init() {
     initMap();
     buildNodeList();
     updateOverview();
+    renderOverviewChart();
 
     // เริ่มจำลองข้อมูลทันที (จะหยุดเมื่อเชื่อมต่อ MQTT สำเร็จ)
     startSimulation();
 
     // เชื่อมต่อ MQTT อัตโนมัติ
     setTimeout(() => connectMQTT(), 1000);
-    
+
     // Hide loading screen after map is initialized
     setTimeout(() => {
         const loading = document.getElementById('loadingScreen');

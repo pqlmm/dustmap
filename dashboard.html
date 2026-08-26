@@ -94,7 +94,7 @@
 
         <!-- Health Advisory -->
         <div class="health-advisory ha-nodata" id="healthAdvisory">
-            <span class="ha-icon" id="healthIcon">—</span>
+            <span class="ha-icon" id="healthIcon"></span>
             <div class="ha-content">
                 <span class="ha-text" id="healthText">รอข้อมูล</span>
                 <span class="ha-sub" id="healthSub"></span>
@@ -106,6 +106,31 @@
             <span class="gt-dot" id="globalTimestampDot"></span>
             <span class="gt-text" id="globalTimestampText">ยังไม่มีข้อมูล</span>
         </div>
+
+        <!-- Campus-wide History Chart -->
+        <section class="overview-history" aria-labelledby="overviewHistoryTitle">
+            <div class="overview-history-header">
+                <div>
+                    <span class="overview-history-eyebrow">ทุกจุดตรวจวัด</span>
+                    <h3 id="overviewHistoryTitle">กราฟภาพรวมย้อนหลัง</h3>
+                </div>
+                <span class="overview-history-note">ค่าเฉลี่ย</span>
+            </div>
+            <div class="overview-history-tabs" role="group" aria-label="ช่วงเวลาของกราฟภาพรวม">
+                <button class="overview-history-tab active" type="button" data-overview-range="1">1 วัน</button>
+                <button class="overview-history-tab" type="button" data-overview-range="7">7 วัน</button>
+                <button class="overview-history-tab" type="button" data-overview-range="30">30 วัน</button>
+            </div>
+            <div class="overview-chart-wrap">
+                <svg class="overview-chart" id="overviewChart" viewBox="0 0 290 120" role="img" aria-label="กราฟภาพรวมของทุกจุดตรวจวัด"></svg>
+                <span class="overview-chart-empty" id="overviewChartEmpty">กำลังรอข้อมูล</span>
+            </div>
+            <div class="overview-chart-legend">
+                <span><i class="legend-pm25"></i>PM2.5</span>
+                <span><i class="legend-temp"></i>อุณหภูมิ</span>
+                <span><i class="legend-hum"></i>ความชื้น</span>
+            </div>
+        </section>
 
         <!-- Sensor Node List -->
         <div class="nodes-section">
@@ -132,10 +157,6 @@
                 <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>มีผลต่อสุขภาพ (>75.0)</span></div>
             </div>
             
-            <button class="btn btn-outline" style="width: 100%; margin-top: 20px; font-size: 0.8rem;" onclick="exportCSV()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                ดาวน์โหลดข้อมูล (CSV)
-            </button>
         </div>
     </aside>
 
@@ -190,9 +211,41 @@
             </div>
         </div>
         <div class="detail-health">
-            <span class="dh-icon" id="detailHealthIcon">—</span>
+            <span class="dh-icon" id="detailHealthIcon"></span>
             <span class="dh-text" id="detailHealthText">รอข้อมูล</span>
         </div>
+        <section class="history-panel" aria-labelledby="historyTitle">
+            <div class="history-header">
+                <div>
+                    <span class="history-eyebrow">ข้อมูลย้อนหลัง</span>
+                    <h4 id="historyTitle">แนวโน้มการตรวจวัด</h4>
+                </div>
+                <button class="history-download" id="historyDownload" type="button" title="ดาวน์โหลดข้อมูลช่วงเวลาที่เลือกเป็น CSV">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+                    CSV
+                </button>
+            </div>
+            <div class="history-controls" aria-label="ตัวเลือกข้อมูลย้อนหลัง">
+                <div class="history-tabs" role="group" aria-label="ช่วงเวลา">
+                    <button class="history-tab active" type="button" data-history-range="1">1 วัน</button>
+                    <button class="history-tab" type="button" data-history-range="7">7 วัน</button>
+                    <button class="history-tab" type="button" data-history-range="30">30 วัน</button>
+                </div>
+                <div class="history-legend" aria-label="คำอธิบายเส้นกราฟ">
+                    <span><i class="legend-pm25"></i>PM2.5</span>
+                    <span><i class="legend-temp"></i>อุณหภูมิ</span>
+                    <span><i class="legend-hum"></i>ความชื้น</span>
+                </div>
+            </div>
+            <div class="history-chart-wrap">
+                <svg class="history-chart" id="historyChart" viewBox="0 0 580 180" role="img" aria-label="กราฟข้อมูลย้อนหลัง"></svg>
+                <div class="history-empty" id="historyEmpty">กำลังรอข้อมูลย้อนหลัง</div>
+            </div>
+            <div class="history-footer">
+                <span id="historySummary">ยังไม่มีข้อมูลบันทึก</span>
+                <span id="historyRangeLabel">ย้อนหลัง 1 วัน</span>
+            </div>
+        </section>
         <div class="detail-update" id="detailUpdate">Last update: --</div>
     </div>
 
