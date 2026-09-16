@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="แผนที่แสดงคุณภาพอากาศ มหาวิทยาลัยราชภัฏภูเก็ต — PM2.5, อุณหภูมิ, ความชื้น แบบเรียลไทม์">
+    <meta name="theme-color" content="#f8fafc">
     <title>PKRU Air Quality Map — มหาวิทยาลัยราชภัฏภูเก็ต</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="index.css">
-    <link rel="icon" type="image/jpeg" href="favicon.jpg">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
 <body>
     <!-- Loading Screen -->
@@ -33,7 +34,7 @@
         <div class="sidebar-header">
             <div class="logo">
                 <div class="logo-icon">
-                    <img src="favicon.jpg" alt="PKRU AQI Logo" style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover;">
+                    <img src="favicon.svg" alt="PKRU Air Quality">
                 </div>
                 <div class="logo-text">
                     <h1>PKRU Air Quality</h1>
@@ -44,7 +45,7 @@
                 <a href="index.html" class="sidebar-home" title="กลับหน้าแรก">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
                 </a>
-                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="ซ่อนแถบข้อมูล" aria-expanded="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
             </div>
@@ -122,7 +123,7 @@
                 <button class="overview-history-tab" type="button" data-overview-range="30">30 วัน</button>
             </div>
             <div class="overview-chart-wrap">
-                <svg class="overview-chart" id="overviewChart" viewBox="0 0 290 120" role="img" aria-label="กราฟภาพรวมของทุกจุดตรวจวัด"></svg>
+                <svg class="overview-chart" id="overviewChart" viewBox="0 0 290 120" preserveAspectRatio="none" role="img" aria-label="กราฟภาพรวมของทุกจุดตรวจวัด"></svg>
                 <span class="overview-chart-empty" id="overviewChartEmpty">กำลังรอข้อมูล</span>
             </div>
             <div class="overview-chart-legend">
@@ -132,19 +133,27 @@
             </div>
         </section>
 
-        <!-- Sensor Node List -->
-        <div class="nodes-section">
-            <h3 class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                จุดตรวจวัด
-            </h3>
-            <div class="node-list" id="nodeList">
-                <!-- Dynamically populated -->
-            </div>
-        </div>
-
         <!-- AQI Legend -->
         <div class="legend-section">
+            <div class="compare-sources" aria-labelledby="compareSourcesTitle">
+                <div class="compare-sources-heading">
+                    <span id="compareSourcesTitle">เปรียบเทียบกับแหล่งอื่น</span>
+                    <small>เปิดเว็บไซต์ ↗</small>
+                </div>
+                <div class="compare-source-links">
+                    <a href="https://air4thai.pcd.go.th/webV3/#/Home" target="_blank" rel="noopener noreferrer">
+                        <span><strong>Air4Thai</strong><small>กรมควบคุมมลพิษ</small></span><b>PCD</b>
+                    </a>
+                    <a href="https://pm25.gistda.or.th/pm25/" target="_blank" rel="noopener noreferrer">
+                        <span><strong>GISTDA PM2.5</strong><small>ข้อมูลเชิงพื้นที่และดาวเทียม</small></span><b>GISTDA</b>
+                    </a>
+                    <a href="https://www.iqair.com/th-en/air-quality/thailand/phuket" target="_blank" rel="noopener noreferrer">
+                        <span><strong>IQAir Phuket</strong><small>เครือข่ายสถานีในภูเก็ต</small></span><b>IQAir</b>
+                    </a>
+                </div>
+                <p>ค่าอาจต่างกันตามตำแหน่งสถานี เวลาอัปเดต และวิธีประมวลผล</p>
+            </div>
+
             <a class="section-title pm-standard-link" href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer" aria-label="เปิดมาตรฐาน PM2.5 ของกรมควบคุมมลพิษในแท็บใหม่">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 มาตรฐาน PM2.5 <span>↗</span>
@@ -156,12 +165,11 @@
                 <div class="legend-item"><span class="legend-color" style="background:#f97316"></span><span>เริ่มมีผลกระทบ (37.6–75.0)</span></div>
                 <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>มีผลต่อสุขภาพ (>75.0)</span></div>
             </div>
-            
         </div>
     </aside>
 
     <!-- Mobile Sidebar Toggle -->
-    <button class="mobile-toggle" id="mobileToggle" aria-label="Open sidebar">
+    <button class="mobile-toggle" id="mobileToggle" aria-label="เปิดแถบข้อมูล" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
 
@@ -169,7 +177,7 @@
     <div class="map-container" id="mapContainer">
         <div id="map"></div>
         <!-- Theme Toggle (floating on map) -->
-        <button class="map-btn theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <button class="map-btn theme-toggle" id="themeToggle" aria-label="เปลี่ยนเป็นแผนที่มืด">
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
@@ -177,7 +185,7 @@
 
     <!-- Selected Node Detail Panel (bottom overlay on map) -->
     <div class="detail-panel" id="detailPanel">
-        <button class="detail-close" id="detailClose" aria-label="Close detail">
+        <button class="detail-close" id="detailClose" aria-label="ปิดรายละเอียดจุดตรวจวัด">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <div class="detail-header">

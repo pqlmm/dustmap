@@ -251,12 +251,18 @@ function initTheme() {
         state.theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     document.documentElement.setAttribute('data-theme', state.theme);
+    if (dom.themeToggle) {
+        dom.themeToggle.setAttribute('aria-label', state.theme === 'light' ? 'เปลี่ยนเป็นแผนที่มืด' : 'เปลี่ยนเป็นแผนที่สว่าง');
+    }
 }
 
 function toggleTheme() {
     state.theme = state.theme === 'light' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', state.theme);
     localStorage.setItem('pkru_aqm_theme', state.theme);
+    if (dom.themeToggle) {
+        dom.themeToggle.setAttribute('aria-label', state.theme === 'light' ? 'เปลี่ยนเป็นแผนที่มืด' : 'เปลี่ยนเป็นแผนที่สว่าง');
+    }
     
     // OpenStreetMap tiles do not require an API key; keep the same source in both UI themes.
     if (state.tileLayer) {
@@ -274,10 +280,7 @@ function initMap() {
         attributionControl: true,
     });
 
-    // Add zoom control first
-    L.control.zoom({ position: 'topleft' }).addTo(state.map);
-
-    // Add custom sidebar-toggle control (same style as zoom, right below it)
+    // Add custom sidebar-toggle control
     const SidebarToggleControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function () {
@@ -287,13 +290,14 @@ function initMap() {
             link.title = 'เปิดเมนู';
             link.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><polyline points="9 18 15 12 9 6"/></svg>';
             link.setAttribute('role', 'button');
-            link.setAttribute('aria-label', 'Open sidebar');
+            link.setAttribute('aria-label', 'เปิดแถบข้อมูล');
 
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.on(link, 'click', function (e) {
                 L.DomEvent.preventDefault(e);
                 dom.sidebar.classList.remove('collapsed');
                 container.classList.remove('visible');
+                if (dom.sidebarToggle) dom.sidebarToggle.setAttribute('aria-expanded', 'true');
                 setTimeout(() => state.map.invalidateSize(), 350);
             });
 
@@ -501,6 +505,7 @@ function updateDetailPanel(node) {
 
 // ===== Node List (Sidebar) =====
 function buildNodeList() {
+    if (!dom.nodeList) return;
     dom.nodeList.innerHTML = '';
     SENSOR_NODES.forEach(node => {
         const aqi = getAQILevel(node.data.pm25);
@@ -532,6 +537,7 @@ function buildNodeList() {
 }
 
 function updateNodeList() {
+    if (!dom.nodeList) return;
     const items = dom.nodeList.querySelectorAll('.node-item');
     items.forEach(item => {
         const nodeId = item.dataset.nodeId;
@@ -839,6 +845,28 @@ function getHistoryRows(nodeId, days = state.historyRange) {
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 }
 
+function getHistoryCoverage(rows) {
+    const timestamps = rows
+        .map(row => new Date(row.timestamp).getTime())
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b);
+    if (!timestamps.length) return null;
+    return {
+        first: timestamps[0],
+        last: timestamps[timestamps.length - 1],
+        duration: Math.max(0, timestamps[timestamps.length - 1] - timestamps[0]),
+    };
+}
+
+function formatHistoryCoverage(duration) {
+    const minutes = Math.max(1, Math.round(duration / 60000));
+    if (minutes < 60) return `${minutes} นาที`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours} ชั่วโมง`;
+    const days = Math.round(hours / 24);
+    return `${days} วัน`;
+}
+
 function getOverviewHistoryRows(days = state.overviewHistoryRange) {
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     const buckets = new Map();
@@ -893,7 +921,9 @@ function renderHistoryChart() {
     ];
     const rows = getHistoryRows(state.selectedNodeId);
     const rangeText = `ย้อนหลัง ${state.historyRange} วัน`;
-    if (dom.historyRangeLabel) dom.historyRangeLabel.textContent = rangeText;
+    if (dom.historyRangeLabel) {
+        dom.historyRangeLabel.textContent = `${rangeText} · มี ${rows.length.toLocaleString('th-TH')} รายการ`;
+    }
     if (dom.historyEmpty) dom.historyEmpty.classList.toggle('visible', rows.length < 2);
 
     if (rows.length === 0) {
@@ -968,8 +998,10 @@ if (dom.themeToggle) {
 if (dom.sidebarToggle) dom.sidebarToggle.addEventListener('click', () => {
     if (window.innerWidth <= 768) {
         dom.sidebar.classList.toggle('open');
+        dom.sidebarToggle.setAttribute('aria-expanded', String(dom.sidebar.classList.contains('open')));
     } else {
         dom.sidebar.classList.toggle('collapsed');
+        dom.sidebarToggle.setAttribute('aria-expanded', String(!dom.sidebar.classList.contains('collapsed')));
         // Show/hide the Leaflet sidebar-open control
         if (dom.sidebar.classList.contains('collapsed') && state.sidebarToggleControl) {
             state.sidebarToggleControl.classList.add('visible');
@@ -982,6 +1014,7 @@ if (dom.sidebarToggle) dom.sidebarToggle.addEventListener('click', () => {
 
 if (dom.mobileToggle) dom.mobileToggle.addEventListener('click', () => {
     dom.sidebar.classList.toggle('open');
+    dom.mobileToggle.setAttribute('aria-expanded', String(dom.sidebar.classList.contains('open')));
 });
 
 if (dom.detailClose) dom.detailClose.addEventListener('click', () => {
@@ -1017,17 +1050,19 @@ function exportCSV() {
     const selected = state.selectedNodeId;
     const rows = selected
         ? getHistoryRows(selected)
-        : loadHistory().filter(row => new Date(row.timestamp).getTime() >= Date.now() - state.historyRange * 86400000);
+        : loadHistory()
+            .filter(row => new Date(row.timestamp).getTime() >= Date.now() - state.historyRange * 86400000)
+            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     if (!rows.length) {
         showToast('ยังไม่มีข้อมูลย้อนหลังสำหรับดาวน์โหลด', 'warning');
         return;
     }
     const csvEscape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    let csv = '\uFEFFTimestamp,Node_ID,Location,PM2.5(µg/m3),Temperature(°C),Humidity(%RH),AQI_Status\n';
+    let csv = '\uFEFFTimestamp,Location,PM2.5(µg/m3),Temperature(°C),Humidity(%RH),AQI_Status\n';
     rows.forEach(row => {
         const node = SENSOR_NODES.find(item => item.id === row.nodeId);
         const aqi = getAQILevel(Number(row.pm25));
-        csv += [row.timestamp, row.nodeId, node ? node.name : row.nodeId, Number(row.pm25).toFixed(1), Number(row.temperature).toFixed(1), Number(row.humidity).toFixed(1), aqi.text].map(csvEscape).join(',') + '\n';
+        csv += [row.timestamp, node ? node.name : 'ไม่ทราบตำแหน่ง', Number(row.pm25).toFixed(1), Number(row.temperature).toFixed(1), Number(row.humidity).toFixed(1), aqi.text].map(csvEscape).join(',') + '\n';
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1040,7 +1075,17 @@ function exportCSV() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`ดาวน์โหลด CSV ย้อนหลัง ${state.historyRange} วันแล้ว`, 'success');
+    const coverage = getHistoryCoverage(rows);
+    const requestedDuration = state.historyRange * 24 * 60 * 60 * 1000;
+    const hasFullCoverage = coverage && coverage.duration >= requestedDuration - 15 * 60 * 1000;
+    const coverageText = coverage ? formatHistoryCoverage(coverage.duration) : 'ไม่ทราบช่วงเวลา';
+    showToast(
+        hasFullCoverage
+            ? `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการย้อนหลัง ${state.historyRange} วันแล้ว`
+            : `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการ · มีข้อมูลจริง ${coverageText} (ยังไม่ครบ ${state.historyRange} วัน)`,
+        hasFullCoverage ? 'success' : 'warning',
+        6000
+    );
 }
 
 // ===== Initialize =====
