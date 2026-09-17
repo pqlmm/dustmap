@@ -602,6 +602,267 @@ function updateOverview() {
         dom.avgHum.classList.add('value-update');
         setTimeout(() => dom.avgHum.classList.remove('value-update'), 500);
     }
+
+    renderCompareDiffs();
+}
+
+// ===== Compare with other sources (live APIs, no API key) =====
+const COMPARE_LOCATION = { lat: 7.9126, lng: 98.3872 }; // PKRU campus
+const COMPARE_REFRESH_MS = 10 * 60 * 1000;
+const COMPARE_THRESHOLDS = [15, 25, 37.5]; // เกณฑ์ PM2.5 กรมควบคุมมลพิษ
+const COMPARE_SERIES = [
+    { key: 'pkru', label: 'PKRU', color: '#818cf8' },
+    { key: 'air4thai', label: 'Air4Thai', color: '#10b981' },
+    { key: 'gistda', label: 'GISTDA', color: '#f59e0b' },
+    { key: 'openmeteo', label: 'Open-Meteo', color: '#22d3ee' },
+];
+const compareState = { view: 'now', data: {} };
+
+function distanceKm(lat1, lon1, lat2, lon2) {
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.sqrt(a));
+}
+
+async function fetchJSON(url, timeoutMs = 15000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+// "2026-09-17 20:00:00" / "2026-09-17T20:00" → Date (เวลาไทย)
+function parseBangkokTime(text) {
+    const clean = String(text).replace(' ', 'T').replace(/\.\d+Z?$|Z$/, '');
+    return new Date((clean.length === 16 ? clean + ':00' : clean) + '+07:00');
+}
+
+function bangkokDate(offsetDays = 0) {
+    return new Date(Date.now() + offsetDays * 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+}
+
+function formatHour(date) {
+    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
+}
+
+const COMPARE_SOURCES = {
+    // กรมควบคุมมลพิษ — สถานีภาคพื้นดินที่ใกล้มหาวิทยาลัยที่สุด (ค่ารายชั่วโมง)
+    async air4thai() {
+        const list = await fetchJSON('https://air4thai.com/forweb/getAQI_JSON.php');
+        const nearest = (list.stations || [])
+            .map(s => ({ s, km: distanceKm(COMPARE_LOCATION.lat, COMPARE_LOCATION.lng, +s.lat, +s.long) }))
+            .filter(x => Number.isFinite(x.km) && parseFloat(x.s.AQILast?.PM25?.value) >= 0)
+            .sort((a, b) => a.km - b.km)[0];
+        if (!nearest) throw new Error('no station');
+        const { s, km } = nearest;
+        const place = `${s.nameTH} · ${km.toFixed(1)} กม.`;
+
+        try {
+            const hist = await fetchJSON(`https://air4thai.com/forweb/getHistoryData.php?stationID=${encodeURIComponent(s.stationID)}&param=PM25&type=hr&sdate=${bangkokDate(-1)}&edate=${bangkokDate(0)}&stime=00&etime=23`);
+            const series = (hist.stations?.[0]?.data || [])
+                .map(r => ({ t: parseBangkokTime(r.DATETIMEDATA), v: Number(r.PM25) }))
+                .filter(p => Number.isFinite(p.v) && p.v >= 0 && !isNaN(p.t));
+            if (!series.length) throw new Error('empty history');
+            const last = series[series.length - 1];
+            return { value: last.v, meta: `${place} · ${formatHour(last.t)}`, series };
+        } catch (err) {
+            // ถ้าดึงรายชั่วโมงไม่ได้ ใช้ค่าล่าสุดจากรายการสถานี (ค่าเฉลี่ย 24 ชม.)
+            console.warn('Air4Thai history failed, using AQILast:', err);
+            return { value: parseFloat(s.AQILast.PM25.value), meta: `${place} · เฉลี่ย 24 ชม.`, series: [] };
+        }
+    },
+    // GISTDA — ค่าประมาณจากดาวเทียมรายตำบล
+    async gistda() {
+        const res = await fetchJSON(`https://pm25.gistda.or.th/rest/getPM25byLocation?lat=${COMPARE_LOCATION.lat}&lng=${COMPARE_LOCATION.lng}`);
+        const d = res.data;
+        if (!d || !Number.isFinite(d.pm25)) throw new Error('no data');
+        // เวลาใน graphHistory24hrs เป็นเวลาไทย (ถึงจะลงท้ายด้วย Z)
+        const series = (d.graphHistory24hrs || [])
+            .map(([v, t]) => ({ t: parseBangkokTime(t), v: Number(v) }))
+            .filter(p => Number.isFinite(p.v) && !isNaN(p.t));
+        const place = d.loc?.tb_tn ? `ต.${d.loc.tb_tn}` : 'ตำแหน่งมหาวิทยาลัย';
+        const time = (d.datetimeThai?.timeThai || '').replace('เวลา ', '');
+        return { value: d.pm25, meta: `${place} · ${time}`, series };
+    },
+    // Open-Meteo — แบบจำลอง CAMS (Copernicus)
+    async openmeteo() {
+        const res = await fetchJSON(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${COMPARE_LOCATION.lat}&longitude=${COMPARE_LOCATION.lng}&current=pm2_5&hourly=pm2_5&past_days=1&forecast_days=1&timezone=Asia%2FBangkok`);
+        const v = res.current?.pm2_5;
+        if (!Number.isFinite(v)) throw new Error('no data');
+        const now = Date.now();
+        const series = (res.hourly?.time || [])
+            .map((t, i) => ({ t: parseBangkokTime(t), v: res.hourly.pm2_5[i] }))
+            .filter(p => Number.isFinite(p.v) && p.t.getTime() <= now);
+        return { value: v, meta: `แบบจำลอง · ${formatHour(parseBangkokTime(res.current.time))}`, series };
+    },
+};
+
+function getSelfPM25() {
+    const nodes = SENSOR_NODES.filter(n => n.data.pm25 !== null);
+    if (!nodes.length) return null;
+    return nodes.reduce((s, n) => s + n.data.pm25, 0) / nodes.length;
+}
+
+// ค่าเฉลี่ยรายชั่วโมงของเซนเซอร์ PKRU จากประวัติที่เก็บในเบราว์เซอร์
+function getSelfSeries(hours = 24) {
+    const cutoff = Date.now() - hours * 3600000;
+    const buckets = new Map();
+    loadHistory().forEach(row => {
+        const t = new Date(row.timestamp).getTime();
+        const v = Number(row.pm25);
+        if (!(t >= cutoff) || !Number.isFinite(v)) return;
+        const hour = Math.floor(t / 3600000) * 3600000;
+        const b = buckets.get(hour) || { sum: 0, n: 0 };
+        b.sum += v; b.n += 1;
+        buckets.set(hour, b);
+    });
+    return [...buckets.entries()].sort((a, b) => a[0] - b[0])
+        .map(([hour, b]) => ({ t: new Date(hour + 1800000), v: b.sum / b.n }));
+}
+
+function renderCompareBars() {
+    const values = { pkru: getSelfPM25() };
+    Object.keys(COMPARE_SOURCES).forEach(k => { values[k] = compareState.data[k]?.value ?? null; });
+    const finite = Object.values(values).filter(Number.isFinite);
+    const max = Math.max(50, Math.ceil(Math.max(0, ...finite) / 10) * 10);
+    const pct = v => `${Math.min(100, Math.max(0, v / max * 100)).toFixed(1)}%`;
+
+    document.querySelectorAll('.compare-bar-row').forEach(row => {
+        const v = values[row.dataset.source];
+        const bar = row.querySelector('[data-role="bar"]');
+        const valueEl = row.querySelector('[data-role="value"]');
+        const track = row.querySelector('.compare-bar-track');
+        track.querySelectorAll('.compare-tick').forEach(t => t.remove());
+        COMPARE_THRESHOLDS.forEach(th => {
+            const tick = document.createElement('span');
+            tick.className = 'compare-tick';
+            tick.style.left = pct(th);
+            track.appendChild(tick);
+        });
+        if (Number.isFinite(v)) {
+            bar.style.width = pct(v);
+            bar.style.backgroundColor = getAQILevel(v).color;
+            valueEl.textContent = v.toFixed(1);
+        } else {
+            bar.style.width = '0';
+            valueEl.textContent = '--';
+        }
+    });
+
+    const axis = document.getElementById('compareAxis');
+    if (axis) {
+        axis.innerHTML = [0, ...COMPARE_THRESHOLDS, max]
+            .map(v => `<span style="left:${pct(v)}">${v}</span>`).join('');
+    }
+}
+
+function renderCompareTrend() {
+    const svg = document.getElementById('compareTrendChart');
+    if (!svg) return;
+    const W = 300, H = 140, L = 24, R = 6, T = 8, B = 16;
+    const w = W - L - R, h = H - T - B;
+    const end = Date.now(), start = end - 24 * 3600000;
+
+    const series = COMPARE_SERIES.map(cfg => ({
+        ...cfg,
+        points: (cfg.key === 'pkru' ? getSelfSeries() : (compareState.data[cfg.key]?.series || []))
+            .filter(p => p.t.getTime() >= start && p.t.getTime() <= end),
+    }));
+    const all = series.flatMap(s => s.points.map(p => p.v));
+    if (!all.length) {
+        svg.innerHTML = `<text class="compare-trend-empty" x="${W / 2}" y="${H / 2}" text-anchor="middle">ยังไม่มีข้อมูลย้อนหลัง</text>`;
+        return;
+    }
+    const max = Math.max(50, Math.ceil(Math.max(...all) / 10) * 10);
+    const x = t => L + (t - start) / (end - start) * w;
+    const y = v => T + (1 - Math.min(v, max) / max) * h;
+
+    let out = '';
+    // เส้นเกณฑ์ + ป้ายแกน Y
+    [0, ...COMPARE_THRESHOLDS, max].forEach(v => {
+        const isTh = COMPARE_THRESHOLDS.includes(v);
+        out += `<line x1="${L}" x2="${L + w}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${isTh ? getAQILevel(v + 0.1).color : 'rgba(148,163,184,.2)'}" stroke-opacity="${isTh ? .35 : 1}" stroke-dasharray="${isTh ? '3 3' : ''}"/>`;
+        out += `<text x="${L - 4}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${v}</text>`;
+    });
+    // ป้ายแกน X
+    [[start, '-24 ชม.'], [start + 12 * 3600000, '-12 ชม.'], [end, 'ตอนนี้']].forEach(([t, label], i) => {
+        out += `<text x="${x(t).toFixed(1)}" y="${H - 3}" text-anchor="${['start', 'middle', 'end'][i]}">${label}</text>`;
+    });
+    // เส้นข้อมูล
+    series.forEach(s => {
+        if (!s.points.length) return;
+        const pts = s.points.map(p => `${x(p.t.getTime()).toFixed(1)},${y(p.v).toFixed(1)}`);
+        if (pts.length > 1) {
+            out += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.key === 'pkru' ? 2.2 : 1.6}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+        const last = pts[pts.length - 1].split(',');
+        out += `<circle cx="${last[0]}" cy="${last[1]}" r="2.4" fill="${s.color}"><title>${s.label}: ${s.points[s.points.length - 1].v.toFixed(1)} µg/m³</title></circle>`;
+    });
+    svg.innerHTML = out;
+}
+
+function renderCompare() {
+    renderCompareBars();
+    if (compareState.view === 'trend') renderCompareTrend();
+}
+
+// เรียกจาก updateOverview เมื่อค่าเซนเซอร์เปลี่ยน
+function renderCompareDiffs() {
+    renderCompare();
+}
+
+async function refreshCompareSources() {
+    const btn = document.getElementById('compareRefresh');
+    const updated = document.getElementById('compareUpdated');
+    if (btn) btn.classList.add('loading');
+
+    await Promise.all(Object.entries(COMPARE_SOURCES).map(async ([key, load]) => {
+        const row = document.querySelector(`.compare-bar-row[data-source="${key}"]`);
+        const metaEl = row?.querySelector('[data-role="meta"]');
+        try {
+            compareState.data[key] = await load();
+            row?.classList.remove('error');
+            if (metaEl) { metaEl.textContent = compareState.data[key].meta; metaEl.title = compareState.data[key].meta; }
+        } catch (err) {
+            console.warn(`Compare source ${key} failed:`, err);
+            delete compareState.data[key];
+            row?.classList.add('error');
+            if (metaEl) { metaEl.textContent = 'ดึงข้อมูลไม่ได้'; metaEl.title = String(err); }
+        }
+    }));
+
+    renderCompare();
+    if (updated) {
+        updated.textContent = 'อัปเดต ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    }
+    if (btn) btn.classList.remove('loading');
+}
+
+function setCompareView(view) {
+    compareState.view = view;
+    document.querySelectorAll('[data-compare-view]').forEach(tab => tab.classList.toggle('active', tab.dataset.compareView === view));
+    const nowView = document.getElementById('compareNowView');
+    const trendView = document.getElementById('compareTrendView');
+    if (nowView) nowView.hidden = view !== 'now';
+    if (trendView) trendView.hidden = view !== 'trend';
+    renderCompare();
+}
+
+function initCompareSources() {
+    if (!document.getElementById('compareSourceList')) return;
+    document.getElementById('compareRefresh')?.addEventListener('click', refreshCompareSources);
+    document.querySelectorAll('[data-compare-view]').forEach(tab => {
+        tab.addEventListener('click', () => setCompareView(tab.dataset.compareView));
+    });
+    renderCompareBars();
+    refreshCompareSources();
+    setInterval(refreshCompareSources, COMPARE_REFRESH_MS);
 }
 
 // ===== Global Timestamp =====
@@ -1095,6 +1356,7 @@ function init() {
     buildNodeList();
     updateOverview();
     renderOverviewChart();
+    initCompareSources();
 
     // เริ่มจำลองข้อมูลทันที (จะหยุดเมื่อเชื่อมต่อ MQTT สำเร็จ)
     startSimulation();

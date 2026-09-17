@@ -10,8 +10,85 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index.css?v=20260917g">
+    <link rel="stylesheet" href="history-archive.css?v=20260917g">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style id="compare-styles">
+/* เปรียบเทียบ PM2.5 — ฝังไว้ในหน้าเพื่อไม่ให้ติดแคช CSS เก่า */
+.compare-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: .7rem;
+    cursor: pointer;
+}
+.compare-refresh:hover { color: var(--accent-cyan); }
+.compare-refresh.loading { opacity: .5; pointer-events: none; }
+.compare-tabs { margin: 0 0 8px; }
+.compare-tabs .overview-history-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.compare-tab-icon { width: 12px; height: 12px; flex-shrink: 0; }
+.compare-view[hidden] { display: none !important; }
+
+/* Bar chart (current values) */
+.compare-bars { display: grid; gap: 7px; }
+.compare-bar-row {
+    display: grid;
+    grid-template-columns: 92px 1fr 34px;
+    align-items: center;
+    gap: 8px;
+}
+.compare-bar-label { display: flex; min-width: 0; flex-direction: column; line-height: 1.25; }
+.compare-bar-label strong { color: var(--text-primary); font-size: .64rem; font-weight: 600; }
+.compare-bar-row.is-self .compare-bar-label strong { color: #a5b4fc; }
+.compare-bar-label small { color: var(--text-muted); font-size: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compare-bar-track {
+    position: relative;
+    height: 10px;
+    border-radius: 3px;
+    background: rgba(148,163,184,.12);
+    overflow: hidden;
+}
+.compare-bar-track i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    border-radius: 3px;
+    background: #64748b;
+    transition: width .5s ease, background-color .3s ease;
+}
+.compare-bar-track .compare-tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(148,163,184,.35);
+    z-index: 1;
+}
+.compare-bar-row b { color: var(--text-primary); font: 600 .74rem var(--font-mono); text-align: right; }
+.compare-bar-row.error b { color: var(--text-muted); }
+.compare-axis {
+    position: relative;
+    height: 12px;
+    margin: 3px 42px 0 100px;
+    color: var(--text-muted);
+    font: 500 .48rem var(--font-mono);
+}
+.compare-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+
+/* Line chart (24 h) */
+.compare-trend-wrap { position: relative; height: 140px; }
+.compare-trend-chart { display: block; width: 100%; height: 100%; overflow: visible; }
+.compare-trend-chart text { fill: var(--text-muted); font-family: var(--font-mono); font-size: 8px; }
+.compare-trend-empty { fill: var(--text-muted); font-size: 9px; }
+.compare-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
+.compare-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .54rem; }
+.compare-legend i { display: block; width: 11px; height: 2px; border-radius: 2px; }
+    </style>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -131,27 +208,67 @@
                 <span><i class="legend-temp"></i>อุณหภูมิ</span>
                 <span><i class="legend-hum"></i>ความชื้น</span>
             </div>
+            <button type="button" class="archive-open-btn" id="archiveOpen" aria-haspopup="dialog">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                ดูข้อมูลย้อนหลังทั้งหมด
+            </button>
         </section>
 
         <!-- AQI Legend -->
         <div class="legend-section">
             <div class="compare-sources" aria-labelledby="compareSourcesTitle">
                 <div class="compare-sources-heading">
-                    <span id="compareSourcesTitle">เปรียบเทียบกับแหล่งอื่น</span>
-                    <small>เปิดเว็บไซต์ ↗</small>
+                    <span id="compareSourcesTitle">เปรียบเทียบ PM2.5 กับแหล่งอื่น</span>
+                    <button type="button" id="compareRefresh" class="compare-refresh" aria-label="ดึงข้อมูลเปรียบเทียบใหม่">
+                        <small id="compareUpdated">กำลังโหลด…</small> ↻
+                    </button>
                 </div>
-                <div class="compare-source-links">
-                    <a href="https://air4thai.pcd.go.th/webV3/#/Home" target="_blank" rel="noopener noreferrer">
-                        <span><strong>Air4Thai</strong><small>กรมควบคุมมลพิษ</small></span><b>PCD</b>
-                    </a>
-                    <a href="https://pm25.gistda.or.th/pm25/" target="_blank" rel="noopener noreferrer">
-                        <span><strong>GISTDA PM2.5</strong><small>ข้อมูลเชิงพื้นที่และดาวเทียม</small></span><b>GISTDA</b>
-                    </a>
-                    <a href="https://www.iqair.com/th-en/air-quality/thailand/phuket" target="_blank" rel="noopener noreferrer">
-                        <span><strong>IQAir Phuket</strong><small>เครือข่ายสถานีในภูเก็ต</small></span><b>IQAir</b>
-                    </a>
+                <div class="overview-history-tabs compare-tabs" role="group" aria-label="มุมมองการเปรียบเทียบ">
+                    <button class="overview-history-tab active" type="button" data-compare-view="now" title="กราฟแท่ง: ค่าล่าสุดของแต่ละแหล่ง"><svg class="compare-tab-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="4" width="12" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="8" height="4" rx="1"/></svg>ตอนนี้</button>
+                    <button class="overview-history-tab" type="button" data-compare-view="trend" title="กราฟเส้น: ค่ารายชั่วโมงย้อนหลัง 24 ชั่วโมง"><svg class="compare-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8"/></svg>24 ชม.</button>
                 </div>
-                <p>ค่าอาจต่างกันตามตำแหน่งสถานี เวลาอัปเดต และวิธีประมวลผล</p>
+
+                <!-- View: current values (bar chart) -->
+                <div class="compare-view" id="compareNowView">
+                    <div class="compare-bars" id="compareSourceList">
+                        <div class="compare-bar-row is-self" data-source="pkru">
+                            <div class="compare-bar-label"><strong>PKRU</strong><small data-role="meta">เซนเซอร์ของเรา</small></div>
+                            <div class="compare-bar-track"><i data-role="bar"></i></div>
+                            <b data-role="value">--</b>
+                        </div>
+                        <div class="compare-bar-row" data-source="air4thai">
+                            <div class="compare-bar-label"><strong>Air4Thai</strong><small data-role="meta">กำลังโหลด…</small></div>
+                            <div class="compare-bar-track"><i data-role="bar"></i></div>
+                            <b data-role="value">--</b>
+                        </div>
+                        <div class="compare-bar-row" data-source="gistda">
+                            <div class="compare-bar-label"><strong>GISTDA</strong><small data-role="meta">กำลังโหลด…</small></div>
+                            <div class="compare-bar-track"><i data-role="bar"></i></div>
+                            <b data-role="value">--</b>
+                        </div>
+                        <div class="compare-bar-row" data-source="openmeteo">
+                            <div class="compare-bar-label"><strong>Open-Meteo</strong><small data-role="meta">กำลังโหลด…</small></div>
+                            <div class="compare-bar-track"><i data-role="bar"></i></div>
+                            <b data-role="value">--</b>
+                        </div>
+                    </div>
+                    <div class="compare-axis" id="compareAxis"></div>
+                </div>
+
+                <!-- View: last 24 hours (line chart) -->
+                <div class="compare-view" id="compareTrendView" hidden>
+                    <div class="compare-trend-wrap">
+                        <svg class="compare-trend-chart" id="compareTrendChart" viewBox="0 0 300 140" role="img" aria-label="กราฟ PM2.5 ย้อนหลัง 24 ชั่วโมงเทียบแต่ละแหล่ง"></svg>
+                    </div>
+                    <div class="compare-legend">
+                        <span><i style="background:#818cf8"></i>PKRU</span>
+                        <span><i style="background:#10b981"></i>Air4Thai</span>
+                        <span><i style="background:#f59e0b"></i>GISTDA</span>
+                        <span><i style="background:#22d3ee"></i>Open-Meteo</span>
+                    </div>
+                </div>
+
+                <p>หน่วย µg/m³ · Air4Thai = สถานีกรมควบคุมมลพิษที่ใกล้ที่สุด · GISTDA และ Open-Meteo เป็นค่าประมาณจากดาวเทียม/แบบจำลอง ค่าอาจต่างกันตามตำแหน่งและวิธีวัด</p>
             </div>
 
             <a class="section-title pm-standard-link" href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer" aria-label="เปิดมาตรฐาน PM2.5 ของกรมควบคุมมลพิษในแท็บใหม่">
@@ -262,8 +379,85 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- ===== ข้อมูลย้อนหลัง ===== -->
+    <div class="archive-overlay" id="archiveOverlay" hidden>
+        <div class="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archiveTitle">
+            <div class="archive-header">
+                <div>
+                    <h2 id="archiveTitle">ข้อมูลย้อนหลัง</h2>
+                    <p>ค่าจากเซนเซอร์ของมหาวิทยาลัยราชภัฏภูเก็ต</p>
+                </div>
+                <button type="button" class="archive-close" id="archiveClose" aria-label="ปิด">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="archive-body">
+                <div class="archive-modes" role="group" aria-label="ความละเอียดของข้อมูล">
+                    <button type="button" data-archive-mode="hour" class="active" aria-pressed="true">รายชั่วโมง</button>
+                    <button type="button" data-archive-mode="day" aria-pressed="false">รายวัน</button>
+                    <button type="button" data-archive-mode="month" aria-pressed="false">รายเดือน</button>
+                    <button type="button" data-archive-mode="year" aria-pressed="false">รายปี</button>
+                </div>
+
+                <form class="archive-form" id="archiveForm" novalidate>
+                    <select class="archive-input archive-station" id="archiveStation" aria-label="จุดตรวจวัด"></select>
+
+                    <fieldset class="archive-metrics">
+                        <legend>ค่าที่ต้องการ</legend>
+                        <label><input type="checkbox" name="archiveMetric" value="pm25" checked><i style="background:#818cf8"></i>PM<sub>2.5</sub></label>
+                        <label><input type="checkbox" name="archiveMetric" value="temperature"><i style="background:#f97316"></i>อุณหภูมิ</label>
+                        <label><input type="checkbox" name="archiveMetric" value="humidity"><i style="background:#22d3ee"></i>ความชื้นสัมพัทธ์</label>
+                    </fieldset>
+
+                    <div class="archive-range">
+                        <div class="archive-range-group">
+                            <label for="archiveStartDate">เริ่มต้น</label>
+                            <div class="archive-range-row">
+                                <input type="date" class="archive-input" id="archiveStartDate">
+                                <input type="month" class="archive-input" id="archiveStartMonth" hidden aria-label="เดือนเริ่มต้น">
+                                <select class="archive-input" id="archiveStartYear" hidden aria-label="ปีเริ่มต้น"></select>
+                                <select class="archive-input" id="archiveStartHour" aria-label="ชั่วโมงเริ่มต้น"></select>
+                            </div>
+                        </div>
+                        <span class="archive-arrow" aria-hidden="true">›</span>
+                        <div class="archive-range-group">
+                            <label for="archiveEndDate">สิ้นสุด</label>
+                            <div class="archive-range-row">
+                                <input type="date" class="archive-input" id="archiveEndDate">
+                                <input type="month" class="archive-input" id="archiveEndMonth" hidden aria-label="เดือนสิ้นสุด">
+                                <select class="archive-input" id="archiveEndYear" hidden aria-label="ปีสิ้นสุด"></select>
+                                <select class="archive-input" id="archiveEndHour" aria-label="ชั่วโมงสิ้นสุด"></select>
+                            </div>
+                        </div>
+                        <button type="submit" class="archive-submit">ตรวจสอบ →</button>
+                    </div>
+                    <p class="archive-error" id="archiveError" role="alert" hidden></p>
+                </form>
+
+                <section class="archive-result" id="archiveResult" hidden aria-live="polite">
+                    <div class="archive-result-head">
+                        <div>
+                            <h3 id="archiveResultTitle"></h3>
+                            <p id="archiveResultRange"></p>
+                        </div>
+                        <button type="button" class="archive-download" id="archiveDownload">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+                            ดาวน์โหลด CSV
+                        </button>
+                    </div>
+                    <div class="archive-summary" id="archiveSummary"></div>
+                    <div class="archive-charts" id="archiveCharts"></div>
+                    <div class="archive-table" id="archiveTable"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260917g"></script>
+    <!-- ข้อมูลจำลอง/ข้อมูลเก่า (ไม่บังคับ): สร้างไฟล์ history-mock.js ที่กำหนด window.PKRU_HISTORY_MOCK = [...] -->
+    <script src="history-mock.js?v=20260917g"></script>
+    <script src="history-archive.js?v=20260917g"></script>
 </body>
 </html>

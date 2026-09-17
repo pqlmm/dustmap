@@ -1905,27 +1905,4 @@ body { letter-spacing: 0; }
     font-weight: 600;
 }
 .compare-sources-heading small { color: var(--text-muted); font-size: .55rem; font-weight: 500; }
-.compare-source-links { display: grid; gap: 4px; }
-.compare-source-links a {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 7px 8px;
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    background: var(--bg-card);
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: var(--transition-fast);
-}
-.compare-source-links a:hover { border-color: var(--accent-indigo); transform: translateX(2px); }
-.compare-source-links a span { display: flex; min-width: 0; flex-direction: column; }
-.compare-source-links strong { font-size: .64rem; font-weight: 600; }
-.compare-source-links small { color: var(--text-muted); font-size: .54rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.compare-source-links b {
-    color: var(--accent-cyan);
-    font: 600 .5rem var(--font-mono);
-    letter-spacing: .03em;
-}
 .compare-sources > p { margin-top: 7px; color: var(--text-muted); font-size: .52rem; line-height: 1.45; }
