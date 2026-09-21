@@ -2,14 +2,14 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="ระบบตรวจวัดคุณภาพอากาศ มหาวิทยาลัยราชภัฏภูเก็ต — PM2.5, อุณหภูมิ, ความชื้น แบบเรียลไทม์">
     <meta name="theme-color" content="#0b0f1a">
     <title>PKRU Air Quality — ระบบตรวจวัดคุณภาพอากาศ มรภ.ภูเก็ต</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="landing.css">
+    <link rel="stylesheet" href="landing.css?v=20260921d">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
 <body>
@@ -59,7 +59,7 @@
                     <svg class="ring-svg" viewBox="0 0 200 200"><circle class="ring-bg" cx="100" cy="100" r="88" /><circle class="ring-progress" id="ringProgress" cx="100" cy="100" r="88" /></svg>
                     <div class="pm25-center"><span class="pm25-value" id="pm25Value">--</span><span class="pm25-unit">μg/m³</span><span class="pm25-label">ค่าเฉลี่ย PM2.5</span></div>
                 </div>
-                <div class="pm25-status" id="pm25Status"><span class="status-icon" id="statusIcon"></span><span class="status-text" id="statusText">กำลังโหลดข้อมูล...</span></div>
+                <div class="pm25-status" id="pm25Status"><span class="status-icon" id="statusIcon"></span><span class="status-text" id="statusText">กำลังเชื่อมต่อเซนเซอร์...</span></div>
                 <div class="live-card-footer">
                     <a href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer">มาตรฐาน PM2.5 <span>↗</span></a>
                     <a href="dashboard.html">ดูรายละเอียดทั้งหมด →</a>
@@ -148,6 +148,10 @@
                         <li>แจ้งเตือนอัตโนมัติเมื่อค่าฝุ่นเกินเกณฑ์มาตรฐาน</li>
                         <li>เก็บข้อมูลระยะยาวเพื่อการวิเคราะห์และวิจัย</li>
                         <li>ส่งเสริมแนวคิด Smart Campus ของมหาวิทยาลัย</li>
+                        <li>ให้ข้อมูลคุณภาพอากาศที่เข้าถึงง่ายผ่านเว็บไซต์ ทั้งบนคอมพิวเตอร์และโทรศัพท์</li>
+                        <li>ช่วยให้นักศึกษาและบุคลากรวางแผนกิจกรรมกลางแจ้งได้อย่างปลอดภัย</li>
+                        <li>เปรียบเทียบค่าที่วัดได้กับแหล่งข้อมูลอ้างอิง เช่น กรมควบคุมมลพิษ และ GISTDA</li>
+                        <li>เป็นต้นแบบการใช้ IoT ต้นทุนต่ำ เพื่อการเรียนการสอนและต่อยอดสู่พื้นที่อื่น</li>
                     </ul>
                 </div>
                 <div class="about-card reveal-item">
@@ -321,8 +325,10 @@
         </div>
     </footer>
 
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="config.js?v=20260921c"></script>
     <script>
-        // ===== PM2.5 Quick View Simulation =====
+        // ===== PM2.5 Quick View =====
         function getAQILevel(pm25) {
             if (pm25 <= 15.0) return { color: '#22d3ee', level: 'very-good', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
             if (pm25 <= 25.0) return { color: '#10b981', level: 'good', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
@@ -360,18 +366,69 @@
             quick.style.setProperty('--aqi-color', aqi.color);
         }
 
-        // Simulate PM2.5 value
+        // ===== ค่า PM2.5 เฉลี่ยจากเซนเซอร์จริง (MQTT) =====
+        const MQTT_CONFIG = window.PKRU_MQTT_CONFIG;
+
+        // ข้อมูลจำลองระหว่างรอข้อมูลจริง (หยุดเองเมื่อมีข้อมูลจริงเข้ามา)
+        const USE_SIMULATION = true;
         let currentPM25 = 18;
+        let simTimer = null;
         function simulatePM25() {
             currentPM25 = Math.max(5, Math.min(60, currentPM25 + (Math.random() - 0.5) * 4));
             updatePM25Display(currentPM25);
         }
+        if (USE_SIMULATION) {
+            setTimeout(() => { if (!simTimer) { simulatePM25(); simTimer = setInterval(simulatePM25, 5000); } }, 800);
+        }
+        function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
+        const NODE_IDS = ['node2', 'node3', 'node4'];
+        const latest = {};
 
-        // Initial + interval
-        setTimeout(() => {
-            simulatePM25();
-            setInterval(simulatePM25, 5000);
-        }, 800);
+        function refreshAverage() {
+            const values = NODE_IDS.map(id => latest[id]).filter(v => Number.isFinite(v));
+            if (!values.length) return;
+            updatePM25Display(values.reduce((a, b) => a + b, 0) / values.length);
+        }
+
+        function setWaiting(text) {
+            if (document.getElementById('pm25Value').textContent === '--') {
+                document.getElementById('statusText').textContent = text;
+            }
+        }
+
+        function connectLanding() {
+            if (!MQTT_CONFIG || typeof mqtt === 'undefined') {
+                setWaiting('เชื่อมต่อเซนเซอร์ไม่ได้');
+                return;
+            }
+            const url = `${MQTT_CONFIG.protocol}://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}${MQTT_CONFIG.path}`;
+            const options = { clientId: 'pkru_home_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 10000, reconnectPeriod: 5000 };
+            if (MQTT_CONFIG.username) { options.username = MQTT_CONFIG.username; options.password = MQTT_CONFIG.password; }
+            const client = mqtt.connect(url, options);
+            const prefix = MQTT_CONFIG.topicPrefix;
+            client.on('connect', () => {
+                client.subscribe(`${prefix}/+`);
+                client.subscribe(`${prefix}/+/pm25`);
+                setWaiting('รอข้อมูลจากเซนเซอร์...');
+            });
+            client.on('message', (topic, message) => {
+                const parts = topic.split('/');
+                const nodeId = parts[1];
+                if (!NODE_IDS.includes(nodeId)) return;
+                const text = message.toString().trim();
+                let value = null;
+                if (parts.length >= 3) {
+                    try { const j = JSON.parse(text); value = typeof j === 'number' ? j : parseFloat(j.value ?? j.pm25); }
+                    catch { value = parseFloat(text); }
+                } else {
+                    try { value = parseFloat(JSON.parse(text).pm25); } catch { /* ไม่ใช่ JSON */ }
+                }
+                if (Number.isFinite(value)) { stopSim(); latest[nodeId] = value; refreshAverage(); }
+            });
+            client.on('offline', () => setWaiting('ขาดการเชื่อมต่อ กำลังลองใหม่...'));
+            client.on('error', () => setWaiting('เชื่อมต่อเซนเซอร์ไม่ได้ กำลังลองใหม่...'));
+        }
+        connectLanding();
 
         // ===== Scroll reveal =====
         const observer = new IntersectionObserver((entries) => {

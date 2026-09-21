@@ -45,6 +45,9 @@ function getFacultyIcon(nodeId) {
 }
 
 // ===== Simulation =====
+// เปิดโหมดจำลองไว้ระหว่างรอข้อมูลจริง (จาก Grafana / MQTT)
+// โหมดจำลองจะหยุดเองทันทีที่มีข้อมูลจริงเข้ามา — ถ้าไม่ต้องการข้อมูลจำลองเลย ให้ตั้งเป็น false
+const USE_SIMULATION = true;
 let simulationInterval = null;
 
 function randomInRange(min, max) {
@@ -72,11 +75,10 @@ function generateSimulatedData() {
 }
 
 function startSimulation() {
-    if (simulationInterval) return;
-    generateSimulatedData();
+    if (!USE_SIMULATION || simulationInterval) return;
     // อัปเดตทุก 5 วินาที
     simulationInterval = setInterval(generateSimulatedData, 5000);
-    showToast('โหมดจำลองข้อมูล — สุ่มค่าอัตโนมัติ', 'info', 4000);
+    generateSimulatedData();
 }
 
 function stopSimulation() {
@@ -87,8 +89,9 @@ function stopSimulation() {
 }
 
 // ===== MQTT Configuration =====
-// ✏️ แก้ไขค่าเชื่อมต่อ MQTT ตรงนี้
-const MQTT_CONFIG = {
+// ✏️ แก้ค่าเชื่อมต่อได้ที่ไฟล์ config.js (ใช้ร่วมกันทั้งหน้าหลักและหน้า dashboard)
+// ค่าด้านล่างใช้เมื่อไม่มีไฟล์ config.js
+const MQTT_CONFIG = window.PKRU_MQTT_CONFIG || {
     host: 'broker.hivemq.com',
     port: 8884,
     protocol: 'wss',
@@ -228,7 +231,13 @@ function getHumStatus(hum) {
 }
 
 // ===== Toast =====
+// ปิดกล่องแจ้งเตือนบนหน้าเว็บแล้ว — ข้อความจะแสดงใน Console (F12) แทน
+const SHOW_TOASTS = false;
 function showToast(message, type = 'info', duration = 3500) {
+    if (!SHOW_TOASTS) {
+        (type === 'error' ? console.warn : console.info)(`[PKRU] ${message}`);
+        return;
+    }
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
@@ -665,16 +674,19 @@ const COMPARE_SOURCES = {
 
         try {
             const hist = await fetchJSON(`https://air4thai.com/forweb/getHistoryData.php?stationID=${encodeURIComponent(s.stationID)}&param=PM25&type=hr&sdate=${bangkokDate(-1)}&edate=${bangkokDate(0)}&stime=00&etime=23`);
+            // Air4Thai ส่ง 0 หรือ -1 เมื่อชั่วโมงนั้นยังไม่มีค่า (เช่น ชั่วโมงปัจจุบันที่ยังไม่ครบ) — ตัดทิ้ง
             const series = (hist.stations?.[0]?.data || [])
                 .map(r => ({ t: parseBangkokTime(r.DATETIMEDATA), v: Number(r.PM25) }))
-                .filter(p => Number.isFinite(p.v) && p.v >= 0 && !isNaN(p.t));
+                .filter(p => Number.isFinite(p.v) && p.v > 0 && !isNaN(p.t));
             if (!series.length) throw new Error('empty history');
             const last = series[series.length - 1];
             return { value: last.v, meta: `${place} · ${formatHour(last.t)}`, series };
         } catch (err) {
             // ถ้าดึงรายชั่วโมงไม่ได้ ใช้ค่าล่าสุดจากรายการสถานี (ค่าเฉลี่ย 24 ชม.)
             console.warn('Air4Thai history failed, using AQILast:', err);
-            return { value: parseFloat(s.AQILast.PM25.value), meta: `${place} · เฉลี่ย 24 ชม.`, series: [] };
+            const fallback = parseFloat(s.AQILast.PM25.value);
+            if (!Number.isFinite(fallback) || fallback <= 0) throw new Error('no data');
+            return { value: fallback, meta: `${place} · ${s.AQILast.time || ''} น. (เฉลี่ย 24 ชม.)`, series: [] };
         }
     },
     // GISTDA — ค่าประมาณจากดาวเทียมรายตำบล
@@ -866,15 +878,40 @@ function initCompareSources() {
 }
 
 // ===== Global Timestamp =====
+// สถานะการเชื่อมต่อ MQTT แสดงที่บรรทัดเวลาในแถบข้าง (แทนกล่องแจ้งเตือน)
+function setConnectionStatus(status) {
+    state.connectionStatus = status;
+    const dot = dom.globalTimestampDot;
+    if (dot) {
+        dot.classList.toggle('active', status === 'online' && !!state.lastDataAt);
+        dot.classList.toggle('offline', status === 'offline' || status === 'error');
+        dot.classList.toggle('connecting', status === 'connecting');
+    }
+    if (!dom.globalTimestampText) return;
+    if (simulationInterval) return; // ระหว่างจำลองข้อมูล ให้บรรทัดเวลาแสดง "ข้อมูลจำลอง"
+    const last = state.lastDataAt
+        ? state.lastDataAt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : null;
+    if (status === 'connecting') {
+        dom.globalTimestampText.textContent = last ? `กำลังเชื่อมต่อใหม่… · ข้อมูลล่าสุด ${last}` : 'กำลังเชื่อมต่อเซนเซอร์…';
+    } else if (status === 'offline' || status === 'error') {
+        dom.globalTimestampText.textContent = last ? `ขาดการเชื่อมต่อ · ข้อมูลล่าสุด ${last}` : 'เชื่อมต่อเซนเซอร์ไม่ได้ — กำลังลองใหม่';
+    } else if (status === 'online' && !last) {
+        dom.globalTimestampText.textContent = 'เชื่อมต่อแล้ว · รอข้อมูลจากเซนเซอร์';
+    }
+}
+
 function updateGlobalTimestamp() {
     const now = new Date();
+    state.lastDataAt = now;
     const dateStr = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     if (dom.globalTimestampText) {
-        dom.globalTimestampText.textContent = `${dateStr} ${timeStr}`;
+        dom.globalTimestampText.textContent = simulationInterval ? `ข้อมูลจำลอง · ${timeStr}` : `${dateStr} ${timeStr}`;
     }
     if (dom.globalTimestampDot) {
         dom.globalTimestampDot.classList.add('active');
+        dom.globalTimestampDot.classList.remove('offline', 'connecting');
     }
 }
 
@@ -946,6 +983,7 @@ function connectMQTT() {
     const config = MQTT_CONFIG;
     const url = `${config.protocol}://${config.host}:${config.port}${config.path}`;
     showToast(`กำลังเชื่อมต่อ ${config.host}...`, 'info');
+    setConnectionStatus('connecting');
 
     const options = {
         clientId: 'pkru_aqm_' + Math.random().toString(16).substring(2, 10),
@@ -963,13 +1001,14 @@ function connectMQTT() {
         state.client = mqtt.connect(url, options);
     } catch (err) {
         showToast(`เชื่อมต่อล้มเหลว: ${err.message}`, 'error');
+        setConnectionStatus('error');
         return;
     }
 
     state.client.on('connect', () => {
         state.connected = true;
-        stopSimulation();
-        showToast('เชื่อมต่อ MQTT สำเร็จ! (หยุดจำลองข้อมูล)', 'success');
+        showToast('เชื่อมต่อ MQTT สำเร็จ', 'success');
+        setConnectionStatus('online');
 
         // Subscribe to all node topics
         const wildcard = `${config.topicPrefix}/+/+`;
@@ -983,6 +1022,17 @@ function connectMQTT() {
     });
 
     state.client.on('message', (topic, message) => {
+        // ได้ข้อมูลจริงแล้ว → หยุดโหมดจำลอง
+        const realData = () => {
+            if (!simulationInterval) return;
+            stopSimulation();
+            // ล้างค่าจำลองของทุกจุด ให้เหลือเฉพาะค่าจริง
+            SENSOR_NODES.forEach(n => {
+                n.data.pm25 = null; n.data.temperature = null; n.data.humidity = null; n.data.lastUpdate = null;
+                if (typeof updateMarker === 'function') updateMarker(n.id);
+            });
+        };
+        if (SENSOR_NODES.some(n => n.id === topic.split('/')[1])) realData();
         const prefix = MQTT_CONFIG.topicPrefix;
         const parts = topic.split('/');
 
@@ -1032,18 +1082,21 @@ function connectMQTT() {
     state.client.on('error', (err) => {
         console.error('MQTT Error:', err);
         showToast(`MQTT Error: ${err.message}`, 'error');
+        setConnectionStatus('error');
     });
 
     state.client.on('close', () => {
         if (state.connected) {
             state.connected = false;
-            showToast('ขาดการเชื่อมต่อ — กลับสู่โหมดจำลอง', 'warning');
+            showToast('ขาดการเชื่อมต่อ MQTT', 'warning');
             startSimulation();
         }
+        setConnectionStatus('offline');
     });
 
     state.client.on('reconnect', () => {
         showToast('กำลังเชื่อมต่อใหม่...', 'info');
+        setConnectionStatus('connecting');
     });
 }
 
@@ -1052,14 +1105,17 @@ function disconnectMQTT() {
         state.client.end(true);
         state.client = null;
         state.connected = false;
-        showToast('ตัดการเชื่อมต่อ — กลับสู่โหมดจำลอง', 'info');
+        showToast('ตัดการเชื่อมต่อ MQTT', 'info');
+        setConnectionStatus('offline');
         startSimulation();
     }
 }
 
 // ===== Historical data =====
 // เก็บค่าในเบราว์เซอร์เพื่อให้กราฟและ CSV แสดงข้อมูลที่ได้รับจริง
-const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v1';
+// v2: เริ่มเก็บใหม่เมื่อเปลี่ยนเป็นข้อมูลจริงจาก MQTT (ข้อมูล v1 เป็นข้อมูลจำลอง)
+const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v2';
+try { localStorage.removeItem('pkru-air-quality-history-v1'); } catch { /* ignore */ }
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function loadHistory() {
@@ -1358,11 +1414,12 @@ function init() {
     renderOverviewChart();
     initCompareSources();
 
-    // เริ่มจำลองข้อมูลทันที (จะหยุดเมื่อเชื่อมต่อ MQTT สำเร็จ)
+    // โหมดจำลอง (ปิดอยู่ ดู USE_SIMULATION ด้านบน)
     startSimulation();
 
     // เชื่อมต่อ MQTT อัตโนมัติ
-    setTimeout(() => connectMQTT(), 1000);
+    setConnectionStatus('connecting');
+    setTimeout(() => connectMQTT(), 300);
 
     // Hide loading screen after map is initialized
     setTimeout(() => {

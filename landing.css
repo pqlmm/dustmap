@@ -1506,3 +1506,110 @@ body { background: #0b0f1a; color: #f1f5f9; }
     color: #fff;
     box-shadow: 0 12px 30px rgba(99,102,241,.36);
 }
+
+/* =====================================================================
+   Mobile & tablet polish (โทรศัพท์ / iPad)
+   ===================================================================== */
+html { -webkit-text-size-adjust: 100%; }
+a, button { -webkit-tap-highlight-color: transparent; }
+
+/* เว้นขอบซ้าย-ขวาให้ทุก section — เดิมถูกตั้งเป็น 0 ทำให้การ์ดชิดขอบจอ */
+.info-section, .about-section, .chart-section, .team-section {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+}
+.footer { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+
+/* iPad / แท็บเล็ต */
+@media (max-width: 1100px) {
+    .about-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+    .about-card:first-child { grid-row: auto; }
+    .about-card { padding: 22px 18px; }
+}
+@media (min-width: 541px) and (max-width: 1024px) {
+    .feature-card { grid-column: span 6; min-height: auto; padding: 22px; }
+    .team-card { padding: 22px 12px; }
+}
+
+/* แท็บเล็ตแนวตั้งและโทรศัพท์แนวนอน */
+@media (max-width: 768px) {
+    .nav { left: 0; right: 0; transform: none; margin: 0; width: auto; max-width: none; justify-content: space-between; padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 14px max(18px, env(safe-area-inset-left)); }
+    .nav-logo { gap: 8px; }
+    .nav-logo span { display: inline; font-size: .9rem; white-space: nowrap; }
+    .nav-links { gap: 8px; }
+    .nav-link { padding: 8px 12px; min-height: 40px; display: inline-flex; align-items: center; white-space: nowrap; }
+    .hero-content { padding-top: 96px; }
+    .about-grid { grid-template-columns: 1fr; }
+    .chart-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .chart-legend-inline { flex-wrap: wrap; gap: 6px 14px; }
+}
+
+/* โทรศัพท์ */
+@media (max-width: 540px) {
+    .nav-logo img { width: 28px; height: 28px; }
+    .hero-content { width: calc(100% - 32px); padding: 88px 0 40px; gap: 28px; }
+    .hero-kicker { font-size: .6rem; letter-spacing: .12em; }
+    .hero-title { font-size: clamp(2.2rem, 10.5vw, 2.9rem); line-height: 1.12; margin-bottom: 14px; }
+    .hero-desc { font-size: .95rem; line-height: 1.65; }
+    .hero-actions { gap: 10px; }
+    .btn { min-height: 50px; }
+    .hero-trust { gap: 8px 16px; }
+    .hero-live-card { padding: 18px; }
+
+    .info-section, .about-section, .chart-section, .team-section { padding-top: 56px; padding-bottom: 56px; }
+    .info-title { font-size: 1.7rem; }
+    .section-heading { font-size: 1.45rem; line-height: 1.3; }
+    .info-desc, .section-subtext { font-size: .92rem; margin-bottom: 28px; }
+
+    /* การ์ดคุณสมบัติ: 2 คอลัมน์ กะทัดรัด */
+    .features-grid { margin-top: 24px; }
+    .feature-card { grid-column: span 6; padding: 18px 14px; min-height: auto; }
+    .feature-icon { width: 40px; height: 40px; margin-bottom: 10px; }
+    .feature-card h3 { font-size: .95rem; margin-bottom: 4px; }
+    .feature-card p { font-size: .78rem; line-height: 1.5; }
+
+    .nav-discord { display: none !important; }
+    .nav-logo span { font-size: .82rem; }
+
+    .aqi-scale { padding: 18px 14px; }
+    .aqi-segment { display: flex !important; min-height: 42px; flex-direction: row !important; align-items: center; justify-content: space-between !important; padding: 0 14px !important; }
+    .aqi-segment span { font-size: .85rem; }
+    .aqi-segment small { font-size: .75rem; }
+    .final-cta .btn { width: 100%; }
+
+    .about-card { padding: 20px 16px; }
+    .about-card li { font-size: .88rem; }
+
+    .chart-wrapper { padding: 16px 12px; }
+    .chart-stats { grid-template-columns: repeat(2, 1fr); }
+
+    /* ทีมผู้จัดทำ: การ์ดแนวนอน อ่านง่ายขึ้น */
+    .team-card {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        grid-template-rows: auto auto auto;
+        column-gap: 14px;
+        align-items: center;
+        text-align: left;
+        padding: 16px;
+    }
+    .team-avatar { grid-row: 1 / 4; width: 48px; height: 48px; margin: 0; }
+    .team-role, .team-name, .team-dept { grid-column: 2; margin: 0; }
+    .team-name { font-size: 1rem; }
+
+    .contact-box { padding: 16px; gap: 12px; }
+    .footer-links { flex-wrap: wrap; justify-content: center; gap: 8px 18px; }
+    .footer-links a { padding: 6px 0; }
+    .footer-disclaimer { text-align: left; }
+}
+
+/* อุปกรณ์สัมผัส: ปิดเอฟเฟกต์ hover ที่ทำให้การ์ดขยับค้าง */
+@media (hover: none) {
+    .feature-card:hover, .about-card:hover, .team-card:hover, .contact-box:hover { transform: none; }
+}
+
+/* การ์ดวัตถุประสงค์ (การ์ดสูงด้านซ้ายบนจอใหญ่): เว้นบรรทัดให้พอดีความสูงการ์ด */
+@media (min-width: 1101px) {
+    .about-card:first-child ul { display: flex; flex-direction: column; gap: 10px; }
+    .about-card:first-child li { margin-bottom: 0; font-size: .95rem; line-height: 1.6; }
+}
