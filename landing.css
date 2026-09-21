@@ -1613,3 +1613,36 @@ a, button { -webkit-tap-highlight-color: transparent; }
     .about-card:first-child ul { display: flex; flex-direction: column; gap: 10px; }
     .about-card:first-child li { margin-bottom: 0; font-size: .95rem; line-height: 1.6; }
 }
+
+/* ===== ปุ่มเปลี่ยนภาษา TH / EN ===== */
+.lang-switch {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 999px;
+    background: rgba(11,15,26,.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.lang-switch button {
+    min-width: 38px;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(241,245,249,.7);
+    font: 600 .72rem var(--font-mono, monospace);
+    letter-spacing: .04em;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.lang-switch button:hover { color: #fff; }
+.lang-switch button.active { background: #f1f5f9; color: #0b0f1a; }
+@media (max-width: 540px) {
+    .lang-switch button { min-width: 34px; padding: 0 8px; }
+}
+
+/* หัวข้อใหญ่: ตัดบรรทัดให้สมดุล ไม่เหลือคำเดียวค้างบรรทัดสุดท้าย (ขนาดตัวอักษรเท่ากันทั้งสองภาษา) */
+.hero-title, .hero-title .gradient-text { text-wrap: balance; }
+.hero-title .gradient-text { display: inline-block; }

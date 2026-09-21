@@ -92,8 +92,8 @@ function stopSimulation() {
 // ✏️ แก้ค่าเชื่อมต่อได้ที่ไฟล์ config.js (ใช้ร่วมกันทั้งหน้าหลักและหน้า dashboard)
 // ค่าด้านล่างใช้เมื่อไม่มีไฟล์ config.js
 const MQTT_CONFIG = window.PKRU_MQTT_CONFIG || {
-    host: 'broker.hivemq.com',
-    port: 8884,
+    host: 'test.mosquitto.org',
+    port: 8081,
     protocol: 'wss',
     path: '/mqtt',
     username: '',
@@ -670,7 +670,8 @@ const COMPARE_SOURCES = {
             .sort((a, b) => a.km - b.km)[0];
         if (!nearest) throw new Error('no station');
         const { s, km } = nearest;
-        const place = `${s.nameTH} · ${km.toFixed(1)} กม.`;
+        const stationName = (window.PKRU_LANG === 'en' && s.nameEN) || s.nameTH;
+        const place = `${stationName} · ${km.toFixed(1)} กม.`;
 
         try {
             const hist = await fetchJSON(`https://air4thai.com/forweb/getHistoryData.php?stationID=${encodeURIComponent(s.stationID)}&param=PM25&type=hr&sdate=${bangkokDate(-1)}&edate=${bangkokDate(0)}&stime=00&etime=23`);
@@ -698,7 +699,7 @@ const COMPARE_SOURCES = {
         const series = (d.graphHistory24hrs || [])
             .map(([v, t]) => ({ t: parseBangkokTime(t), v: Number(v) }))
             .filter(p => Number.isFinite(p.v) && !isNaN(p.t));
-        const place = d.loc?.tb_tn ? `ต.${d.loc.tb_tn}` : 'ตำแหน่งมหาวิทยาลัย';
+        const place = (window.PKRU_LANG === 'en' && d.loc?.tb_en) ? d.loc.tb_en : (d.loc?.tb_tn ? `ต.${d.loc.tb_tn}` : 'ตำแหน่งมหาวิทยาลัย');
         const time = (d.datetimeThai?.timeThai || '').replace('เวลา ', '');
         return { value: d.pm25, meta: `${place} · ${time}`, series };
     },

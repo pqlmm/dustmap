@@ -7,8 +7,11 @@
 //      (ค่า = pm25 | temperature หรือ temp | humidity หรือ hum)
 // nodeId ของแต่ละคณะ: node2 = วิทยาศาสตร์ฯ, node3 = มนุษยศาสตร์ฯ, node4 = วิทยาการจัดการ
 window.PKRU_MQTT_CONFIG = {
-    host: 'broker.hivemq.com',
-    port: 8884,          // พอร์ต WebSocket แบบปลอดภัย (wss) — เบราว์เซอร์ต่อ MQTT ตรงไม่ได้ ต้องผ่าน WebSocket
+    // test.mosquitto.org — broker ทดสอบสาธารณะของ Eclipse Mosquitto
+    //   ESP32 / MQTT Explorer ใช้  mqtt://test.mosquitto.org:1883
+    //   หน้าเว็บ (เบราว์เซอร์) ต้องใช้ WebSocket → wss://test.mosquitto.org:8081
+    host: 'test.mosquitto.org',
+    port: 8081,          // WebSocket แบบเข้ารหัส (wss) — ใช้ได้ทั้งเปิดไฟล์ในเครื่องและบน GitHub Pages (https)
     protocol: 'wss',
     path: '/mqtt',
     username: '',

@@ -10,9 +10,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="index.css?v=20260921d">
-    <link rel="stylesheet" href="history-archive.css?v=20260921d">
-    <link rel="stylesheet" href="mobile.css?v=20260921d">
+    <link rel="stylesheet" href="index.css?v=20260921f">
+    <link rel="stylesheet" href="history-archive.css?v=20260921f">
+    <link rel="stylesheet" href="mobile.css?v=20260921f">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style id="compare-styles">
 /* เปรียบเทียบ PM2.5 — ฝังไว้ในหน้าเพื่อไม่ให้ติดแคช CSS เก่า */
@@ -90,6 +90,8 @@
 .compare-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .54rem; }
 .compare-legend i { display: block; width: 11px; height: 2px; border-radius: 2px; }
     </style>
+    <script>try{if(localStorage.getItem('pkru_lang')==='en')document.documentElement.classList.add('i18n-pending')}catch(e){}</script>
+    <style>.i18n-pending body{opacity:0;animation:i18nShow 0s 1.2s forwards}@keyframes i18nShow{to{opacity:1}}</style>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -456,11 +458,12 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="config.js?v=20260921d"></script>
-    <script src="app.js?v=20260921d"></script>
+    <script src="i18n.js?v=20260921h"></script>
+    <script src="config.js?v=20260921f"></script>
+    <script src="app.js?v=20260921f"></script>
     <!-- ข้อมูลจำลอง/ข้อมูลเก่า (ไม่บังคับ): สร้างไฟล์ history-mock.js ที่กำหนด window.PKRU_HISTORY_MOCK = [...] -->
-    <script src="history-mock.js?v=20260921d"></script>
-    <script src="history-archive.js?v=20260921d"></script>
-    <script src="mobile.js?v=20260921d"></script>
+    <script src="history-mock.js?v=20260921f"></script>
+    <script src="history-archive.js?v=20260921f"></script>
+    <script src="mobile.js?v=20260921f"></script>
 </body>
 </html>
