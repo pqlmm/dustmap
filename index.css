@@ -1981,3 +1981,38 @@ body { letter-spacing: 0; }
 .gt-dot.connecting { background: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,.18); animation: gtPulse 1.2s ease-in-out infinite; }
 .gt-dot.offline { background: #f43f5e !important; box-shadow: 0 0 0 3px rgba(244,63,94,.18); animation: none; }
 @keyframes gtPulse { 50% { opacity: .35; } }
+
+/* ===== หน้าต่างรายละเอียดคณะ: โหมดสว่าง ===== */
+:root[data-theme="light"] .detail-panel {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-card: #f8fafc;
+    --bg-glass: rgba(255,255,255,.97);
+    --border-subtle: rgba(99,102,241,.2);
+    --border-hover: rgba(99,102,241,.4);
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --accent-indigo: #6366f1;
+    --accent-cyan: #0891b2;
+    --accent-emerald: #059669;
+    --accent-amber: #ca8a04;
+    --accent-rose: #e11d48;
+    --accent-orange: #ea580c;
+    color: #0f172a;
+    background: rgba(255,255,255,.97);
+    border-color: rgba(99,102,241,.2);
+    box-shadow: 0 20px 60px rgba(15,23,42,.18);
+}
+:root[data-theme="light"] .detail-panel .detail-card,
+:root[data-theme="light"] .detail-panel .detail-health,
+:root[data-theme="light"] .detail-panel .history-panel { background: #f8fafc; border-color: rgba(99,102,241,.16); }
+:root[data-theme="light"] .detail-panel .detail-close,
+:root[data-theme="light"] .detail-panel .history-download { background: #ffffff; border-color: rgba(99,102,241,.25); color: #475569; }
+:root[data-theme="light"] .detail-panel .history-download:hover { background: rgba(99,102,241,.08); color: #4f46e5; }
+:root[data-theme="light"] .detail-panel .history-tabs { background: #eef2f7; }
+:root[data-theme="light"] .detail-panel .history-tab { color: #64748b; }
+:root[data-theme="light"] .detail-panel .dc-bar { background: rgba(15,23,42,.08); }
+:root[data-theme="light"] .detail-panel .detail-node-name,
+:root[data-theme="light"] .detail-panel h2,
+:root[data-theme="light"] .detail-panel h3 { color: #0f172a; }
