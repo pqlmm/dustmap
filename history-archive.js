@@ -1,7 +1,9 @@
 // ===== PKRU Air Quality — ข้อมูลย้อนหลัง (History archive) =====
-// อ่านข้อมูลจาก 2 แหล่งรวมกัน:
-//   1) ประวัติที่เบราว์เซอร์เก็บไว้ (loadHistory() ใน app.js — เก็บย้อนหลัง 30 วัน)
+// แหล่งข้อมูล (เรียงตามลำดับความสำคัญ):
+//   1) Aerolink API /api/history (InfluxDB ของเพื่อน) — ใช้เมื่อตั้ง URL ไว้ใน config.js
 //   2) ข้อมูลจำลอง/ข้อมูลเก่า window.PKRU_HISTORY_MOCK (ถ้ามีไฟล์ history-mock.js)
+//      ใช้เฉพาะช่วงเวลาก่อนที่ API จะมีข้อมูล
+//   3) ประวัติที่เบราว์เซอร์เก็บไว้ (loadHistory() ใน app.js) — ใช้เมื่อเชื่อมต่อ API ไม่ได้
 //      รูปแบบ: [{ nodeId: 'node2', timestamp: '2024-01-01T00:00:00+07:00', pm25: 18.2, temperature: 29.5, humidity: 78 }, ...]
 (function () {
     'use strict';
@@ -10,7 +12,11 @@
         { key: 'pm25', label: 'PM2.5', unit: 'µg/m³', color: '#818cf8', digits: 1 },
         { key: 'temperature', label: 'อุณหภูมิ', unit: '°C', color: '#f97316', digits: 1 },
         { key: 'humidity', label: 'ความชื้นสัมพัทธ์', unit: '%RH', color: '#22d3ee', digits: 1 },
+        { key: 'pm1', label: 'PM1.0', unit: 'µg/m³', color: '#a78bfa', digits: 1 },
+        { key: 'pm10', label: 'PM10', unit: 'µg/m³', color: '#f472b6', digits: 1 },
+        { key: 'lux', label: 'ความสว่าง', unit: 'lux', color: '#facc15', digits: 0 },
     ];
+    const API = window.PKRU_API || { enabled: false };
     const HOUR = 3600000, DAY = 24 * HOUR;
     const MODES = {
         hour: { label: 'รายชั่วโมง', maxSpanDays: 31 },
@@ -20,28 +26,69 @@
     };
     const MONTHS_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-    const st = { mode: 'hour', result: null, allRows: null };
+    const st = { mode: 'hour', result: null, allRows: null, source: null, apiCache: new Map(), runId: 0 };
     const $ = id => document.getElementById(id);
     const pad = n => String(n).padStart(2, '0');
 
     // ---------- data ----------
-    function getAllRows() {
-        if (st.allRows) return st.allRows;
+    const toRow = row => {
+        const t = row.t ?? Date.parse(row.timestamp);
+        if (!Number.isFinite(t)) return null;
+        return {
+            nodeId: row.nodeId, t,
+            pm25: num(row.pm25), temperature: num(row.temperature), humidity: num(row.humidity),
+            pm1: num(row.pm1), pm10: num(row.pm10), lux: num(row.lux),
+        };
+    };
+    function mergeRows(lists) {
         const seen = new Set();
         const out = [];
-        const add = row => {
-            const t = Date.parse(row.timestamp);
-            if (!Number.isFinite(t)) return;
-            const id = row.nodeId + '|' + t;
+        lists.forEach(list => list.forEach(raw => {
+            const row = toRow(raw);
+            if (!row) return;
+            const id = row.nodeId + '|' + row.t;
             if (seen.has(id)) return;
             seen.add(id);
-            out.push({ nodeId: row.nodeId, t, pm25: num(row.pm25), temperature: num(row.temperature), humidity: num(row.humidity) });
-        };
-        (Array.isArray(window.PKRU_HISTORY_MOCK) ? window.PKRU_HISTORY_MOCK : []).forEach(add);
-        (typeof loadHistory === 'function' ? loadHistory() : []).forEach(add);
+            out.push(row);
+        }));
         out.sort((a, b) => a.t - b.t);
-        st.allRows = out;
         return out;
+    }
+    const mockRows = () => (Array.isArray(window.PKRU_HISTORY_MOCK) ? window.PKRU_HISTORY_MOCK : []);
+
+    // ข้อมูลในเครื่อง (ใช้ตอนยังไม่ได้ค้นหา / เชื่อมต่อ API ไม่ได้)
+    function getAllRows() {
+        if (st.allRows) return st.allRows;
+        st.allRows = mergeRows([mockRows(), typeof loadHistory === 'function' ? loadHistory() : []]);
+        return st.allRows;
+    }
+
+    // ดึงข้อมูลจาก API ให้ครอบคลุมช่วงที่เลือก (API ย้อนหลังนับจากตอนนี้ได้สูงสุด ~35000 ชม.)
+    async function loadRowsFor(q) {
+        if (!API.enabled) {
+            st.allRows = null;
+            return { rows: getAllRows(), source: 'local' };
+        }
+        const hours = Math.min(35000, Math.ceil((Date.now() - q.start) / HOUR) + 1);
+        const deviceId = q.nodeId === 'all' ? undefined : API.deviceIdFor(q.nodeId);
+        const fields = q.metrics.slice().sort();
+        const key = `${hours}|${deviceId || 'all'}|${fields.join(',')}`;
+        let hit = st.apiCache.get(key);
+        if (!hit || Date.now() - hit.at > 5 * 60 * 1000) {
+            try {
+                const res = await API.history(hours, { deviceId, fields });
+                hit = { at: Date.now(), rows: res.rows, resolution: res.resolution };
+                st.apiCache.set(key, hit);
+            } catch (err) {
+                console.warn('[API] archive:', err.message || err);
+                st.allRows = null;
+                return { rows: getAllRows(), source: 'fallback', error: err };
+            }
+        }
+        // ข้อมูลจำลองใช้เฉพาะช่วงก่อนที่ API จะมีข้อมูล (ไม่ปนกับข้อมูลจริง)
+        const firstApi = hit.rows.length ? hit.rows[0].t : Infinity;
+        const older = mockRows().filter(r => Date.parse(r.timestamp) < firstApi);
+        return { rows: mergeRows([hit.rows, older]), source: 'api', resolution: hit.resolution, hasMock: older.length > 0 };
     }
     function num(v) { const n = Number(v); return v === null || v === undefined || v === '' || !Number.isFinite(n) ? null : n; }
 
@@ -211,16 +258,32 @@
     }
 
     // ---------- UI: results ----------
-    function run() {
-        st.allRows = null; // อ่านข้อมูลใหม่ทุกครั้งที่กดตรวจสอบ
+    async function run() {
         const q = readRange();
         if (q.error) { setError(q.error); return; }
         setError('');
+        const runId = ++st.runId;
+        const res = $('archiveResult');
+        const submit = $('archiveForm').querySelector('[type="submit"]');
+        res.hidden = false;
+        $('archiveSource').hidden = true;
+        $('archiveSummary').innerHTML = '';
+        $('archiveTable').innerHTML = '';
+        $('archiveCharts').innerHTML = '<div class="archive-loading">กำลังโหลดข้อมูล…</div>';
+        if (submit) submit.disabled = true;
+        let loaded;
+        try {
+            loaded = await loadRowsFor(q);
+        } finally {
+            if (submit) submit.disabled = false;
+        }
+        if (runId !== st.runId) return; // มีการค้นหาใหม่ระหว่างรอ
+        st.allRows = loaded.rows;
+        st.source = loaded;
+        showSource(loaded);
         const rows = aggregate(q);
         const withData = rows.filter(r => r.count > 0);
         st.result = { ...q, rows };
-        const res = $('archiveResult');
-        res.hidden = false;
 
         const stationName = q.nodeId === 'all' ? 'ทุกจุดตรวจวัด (ค่าเฉลี่ย)' : (SENSOR_NODES.find(n => n.id === q.nodeId)?.name || q.nodeId);
         $('archiveResultTitle').textContent = `${stationName} · ${MODES[q.mode].label}`;
@@ -238,6 +301,21 @@
         renderSummary(q, withData);
         renderCharts();
         renderTable(q, rows);
+    }
+
+    function showSource(loaded) {
+        const el = $('archiveSource');
+        if (!el) return;
+        let text = '';
+        if (loaded.source === 'api') {
+            text = 'แหล่งข้อมูล: Aerolink API';
+            if (loaded.hasMock) text += ' · ช่วงก่อนหน้าใช้ข้อมูลจำลอง';
+        } else if (loaded.source === 'fallback') {
+            text = 'เชื่อมต่อ API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน';
+        }
+        el.textContent = text;
+        el.classList.toggle('warn', loaded.source === 'fallback');
+        el.hidden = !text;
     }
 
     function renderSummary(q, rows) {
@@ -279,6 +357,7 @@
         const vals = pts.filter(p => p.v);
         let lo = Math.min(...vals.map(p => p.v.min)), hi = Math.max(...vals.map(p => p.v.max));
         if (m.key === 'pm25') { lo = 0; hi = Math.max(hi, 50); }
+        else if (m.key === 'pm1' || m.key === 'pm10' || m.key === 'lux') { lo = 0; hi = Math.max(hi, 10); }
         else if (m.key === 'humidity') { lo = Math.max(0, Math.floor((lo - 5) / 10) * 10); hi = Math.min(100, Math.ceil((hi + 5) / 10) * 10); }
         else { lo = Math.floor(lo - 1); hi = Math.ceil(hi + 1); }
         if (hi <= lo) hi = lo + 1;
@@ -391,7 +470,7 @@
         requestAnimationFrame(() => ov.classList.add('active'));
         document.body.classList.add('archive-open');
         if (!st.result) run();
-        else renderCharts();
+        else if (st.result.rows) renderCharts();
         setTimeout(() => $('archiveClose').focus(), 50);
     }
     function close() {

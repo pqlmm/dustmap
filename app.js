@@ -13,7 +13,7 @@ const SENSOR_NODES = [
         description: 'Faculty of Science & Technology',
         lat: 7.914588491091475,
         lng: 98.38881665269558,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
+        data: { pm25: null, pm1: null, pm10: null, temperature: null, humidity: null, lux: null, lastUpdate: null }
     },
     {
         id: 'node3',
@@ -21,7 +21,7 @@ const SENSOR_NODES = [
         description: 'Faculty of Humanities & Social Sciences',
         lat: 7.9090528204855755,
         lng: 98.38655930865212,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
+        data: { pm25: null, pm1: null, pm10: null, temperature: null, humidity: null, lux: null, lastUpdate: null }
     },
     {
         id: 'node4',
@@ -29,7 +29,7 @@ const SENSOR_NODES = [
         description: 'Faculty of Management Sciences',
         lat: 7.913082581293544,
         lng: 98.38724860930434,
-        data: { pm25: null, temperature: null, humidity: null, lastUpdate: null }
+        data: { pm25: null, pm1: null, pm10: null, temperature: null, humidity: null, lux: null, lastUpdate: null }
     }
 ];
 
@@ -86,6 +86,18 @@ function stopSimulation() {
         clearInterval(simulationInterval);
         simulationInterval = null;
     }
+}
+
+// ได้ข้อมูลจริงครั้งแรก → หยุดโหมดจำลอง และล้างค่าจำลองของทุกจุด ให้เหลือเฉพาะค่าจริง
+function switchToRealData() {
+    if (state.realMode) return;
+    state.realMode = true;
+    stopSimulation();
+    state.lastDataAt = null;
+    SENSOR_NODES.forEach(n => {
+        Object.keys(n.data).forEach(k => { n.data[k] = null; });
+        if (state.markers[n.id]) updateMarker(n.id);
+    });
 }
 
 // ===== MQTT Configuration =====
@@ -499,6 +511,25 @@ function updateDetailPanel(node) {
     dom.detailHumBar.style.width = hum !== null ? Math.min(hum, 100) + '%' : '0%';
     dom.detailHumStatus.textContent = getHumStatus(hum);
 
+    // PM1.0 / PM10 / ความสว่าง (มีเฉพาะข้อมูลจาก Aerolink API)
+    const extra = document.getElementById('detailExtra');
+    if (extra) {
+        const items = [
+            ['pm1', 'PM1.0', 'μg/m³', 1],
+            ['pm10', 'PM10', 'μg/m³', 1],
+            ['lux', 'ความสว่าง', 'lux', 0],
+        ];
+        const hasAny = items.some(([k]) => node.data[k] !== null && node.data[k] !== undefined);
+        extra.hidden = !hasAny;
+        if (hasAny) {
+            extra.innerHTML = items.map(([k, label, unit, digits]) => {
+                const v = node.data[k];
+                const text = v !== null && v !== undefined ? v.toFixed(digits) : '--';
+                return `<div class="de-item"><span class="de-label">${label}</span><span class="de-value">${text}<small>${unit}</small></span></div>`;
+            }).join('');
+        }
+    }
+
     // Detail health advisory
     setHealthIcon(dom.detailHealthIcon, advice);
     if (dom.detailHealthText) dom.detailHealthText.textContent = `${advice.text} — ${advice.sub}`;
@@ -596,6 +627,14 @@ function updateOverview() {
         if (dom.healthAdvisory) {
             dom.healthAdvisory.className = `health-advisory ha-${advice.class}`;
         }
+    } else if (state.realMode) {
+        const advice = getHealthAdvice(null);
+        dom.avgPM25.textContent = '--';
+        dom.avgPM25.style.color = '';
+        setHealthIcon(dom.healthIcon, advice);
+        if (dom.healthText) dom.healthText.textContent = 'ไม่มีข้อมูล';
+        if (dom.healthSub) dom.healthSub.textContent = 'เซนเซอร์ยังไม่ได้ส่งข้อมูลล่าสุด';
+        if (dom.healthAdvisory) dom.healthAdvisory.className = 'health-advisory ha-nodata';
     }
 
     if (tempNodes.length > 0) {
@@ -603,6 +642,8 @@ function updateOverview() {
         dom.avgTemp.textContent = avg.toFixed(1);
         dom.avgTemp.classList.add('value-update');
         setTimeout(() => dom.avgTemp.classList.remove('value-update'), 500);
+    } else if (state.realMode) {
+        dom.avgTemp.textContent = '--';
     }
 
     if (humNodes.length > 0) {
@@ -610,6 +651,8 @@ function updateOverview() {
         dom.avgHum.textContent = avg.toFixed(1);
         dom.avgHum.classList.add('value-update');
         setTimeout(() => dom.avgHum.classList.remove('value-update'), 500);
+    } else if (state.realMode) {
+        dom.avgHum.textContent = '--';
     }
 
     renderCompareDiffs();
@@ -726,7 +769,8 @@ function getSelfPM25() {
 function getSelfSeries(hours = 24) {
     const cutoff = Date.now() - hours * 3600000;
     const buckets = new Map();
-    loadHistory().forEach(row => {
+    const apiRows = apiHistory.get(null, Math.ceil(hours / 24), () => { if (compareState.view === 'trend') renderCompareTrend(); });
+    (apiRows || loadHistory()).forEach(row => {
         const t = new Date(row.timestamp).getTime();
         const v = Number(row.pm25);
         if (!(t >= cutoff) || !Number.isFinite(v)) return;
@@ -879,41 +923,213 @@ function initCompareSources() {
 }
 
 // ===== Global Timestamp =====
-// สถานะการเชื่อมต่อ MQTT แสดงที่บรรทัดเวลาในแถบข้าง (แทนกล่องแจ้งเตือน)
+// สถานะการเชื่อมต่อแสดงที่บรรทัดเวลาในแถบข้าง (แทนกล่องแจ้งเตือน)
+//   online     ได้ข้อมูลล่าสุดแล้ว
+//   nodata     API ทำงาน แต่เซนเซอร์ไม่ได้ส่งข้อมูลใน 10 นาทีที่ผ่านมา (API ตอบ 404)
+//   error      เชื่อมต่อ API/MQTT ไม่ได้
+//   connecting กำลังเชื่อมต่อ
+function formatClock(date) {
+    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function simulationNote() {
+    if (!API.enabled) return '';
+    if (state.connectionStatus === 'error') return ' · รอ API';
+    if (state.connectionStatus === 'nodata') return ' · รอเซนเซอร์';
+    return '';
+}
+
 function setConnectionStatus(status) {
     state.connectionStatus = status;
     const dot = dom.globalTimestampDot;
     if (dot) {
         dot.classList.toggle('active', status === 'online' && !!state.lastDataAt);
-        dot.classList.toggle('offline', status === 'offline' || status === 'error');
+        dot.classList.toggle('offline', status === 'offline' || status === 'error' || status === 'nodata');
         dot.classList.toggle('connecting', status === 'connecting');
     }
+    if (dom.globalTimestamp) {
+        const err = status === 'error' && apiState.lastError ? apiState.lastError.message : '';
+        dom.globalTimestamp.title = err;
+    }
     if (!dom.globalTimestampText) return;
-    if (simulationInterval) return; // ระหว่างจำลองข้อมูล ให้บรรทัดเวลาแสดง "ข้อมูลจำลอง"
-    const last = state.lastDataAt
-        ? state.lastDataAt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : null;
+    if (simulationInterval) { // ระหว่างจำลองข้อมูล ให้บรรทัดเวลาแสดง "ข้อมูลจำลอง"
+        dom.globalTimestampText.textContent = `ข้อมูลจำลอง · ${formatClock(new Date())}${simulationNote()}`;
+        return;
+    }
+    const last = state.lastDataAt ? formatClock(state.lastDataAt) : null;
     if (status === 'connecting') {
         dom.globalTimestampText.textContent = last ? `กำลังเชื่อมต่อใหม่… · ข้อมูลล่าสุด ${last}` : 'กำลังเชื่อมต่อเซนเซอร์…';
     } else if (status === 'offline' || status === 'error') {
         dom.globalTimestampText.textContent = last ? `ขาดการเชื่อมต่อ · ข้อมูลล่าสุด ${last}` : 'เชื่อมต่อเซนเซอร์ไม่ได้ — กำลังลองใหม่';
+    } else if (status === 'nodata') {
+        dom.globalTimestampText.textContent = last ? `เซนเซอร์ไม่ได้ส่งข้อมูล · ข้อมูลล่าสุด ${last}` : 'เซนเซอร์ไม่ได้ส่งข้อมูลใน 10 นาทีที่ผ่านมา';
     } else if (status === 'online' && !last) {
         dom.globalTimestampText.textContent = 'เชื่อมต่อแล้ว · รอข้อมูลจากเซนเซอร์';
+    } else if (status === 'online') {
+        updateGlobalTimestamp(state.lastDataAt);
     }
 }
 
-function updateGlobalTimestamp() {
-    const now = new Date();
-    state.lastDataAt = now;
-    const dateStr = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// at = เวลาที่เซนเซอร์วัดค่า (จาก API) — ถ้าไม่ระบุใช้เวลาปัจจุบัน
+function updateGlobalTimestamp(at) {
+    const time = at instanceof Date && !isNaN(at) ? at : new Date();
+    if (!state.lastDataAt || time > state.lastDataAt || simulationInterval) state.lastDataAt = time;
+    const shown = state.lastDataAt;
+    const dateStr = shown.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = formatClock(shown);
     if (dom.globalTimestampText) {
-        dom.globalTimestampText.textContent = simulationInterval ? `ข้อมูลจำลอง · ${timeStr}` : `${dateStr} ${timeStr}`;
+        dom.globalTimestampText.textContent = simulationInterval
+            ? `ข้อมูลจำลอง · ${timeStr}${simulationNote()}`
+            : `${dateStr} ${timeStr}`;
     }
-    if (dom.globalTimestampDot) {
+    if (dom.globalTimestampDot && (simulationInterval || state.connectionStatus === 'online' || !API.enabled)) {
         dom.globalTimestampDot.classList.add('active');
         dom.globalTimestampDot.classList.remove('offline', 'connecting');
     }
+}
+
+// ===== Aerolink API (แหล่งข้อมูลหลัก — ตั้งค่าที่ config.js) =====
+const API = window.PKRU_API || { enabled: false };
+const apiState = { timer: null, lastOk: null, lastError: null, busy: false };
+
+// ใส่ค่าจาก API ลงจุดบนแผนที่
+function applyApiReading(r) {
+    const node = SENSOR_NODES.find(n => n.id === r.nodeId);
+    if (!node) return;
+    node.data.pm25 = r.pm25;
+    node.data.pm1 = r.pm1;
+    node.data.pm10 = r.pm10;
+    node.data.temperature = r.temperature;
+    node.data.humidity = r.humidity;
+    node.data.lux = r.lux;
+    node.data.lastUpdate = r.time || new Date();
+    onNodeDataUpdate(node.id);
+}
+
+// จุดที่ไม่มีค่าใหม่เกิน 10 นาที → แสดง "ไม่มีข้อมูล" แทนค่าเก่า
+function clearStaleNodes(freshIds) {
+    const now = Date.now();
+    SENSOR_NODES.forEach(node => {
+        if (freshIds.has(node.id)) return;
+        const t = node.data.lastUpdate ? node.data.lastUpdate.getTime() : 0;
+        const hasValues = ['pm25', 'pm1', 'pm10', 'temperature', 'humidity', 'lux'].some(k => node.data[k] !== null);
+        if (!hasValues || now - t < API.staleMs) return;
+        ['pm25', 'pm1', 'pm10', 'temperature', 'humidity', 'lux'].forEach(k => { node.data[k] = null; });
+        updateMarker(node.id);
+        updateNodeList();
+        updateOverview();
+        if (state.selectedNodeId === node.id) updateDetailPanel(node);
+    });
+}
+
+async function pollApi() {
+    if (!API.enabled || apiState.busy) return;
+    apiState.busy = true;
+    try {
+        const rows = await API.latest();
+        apiState.lastOk = Date.now();
+        apiState.lastError = null;
+        if (!rows.length) {
+            // API ตอบ 404: เซิร์ฟเวอร์ทำงาน แต่ไม่มีค่าจากเซนเซอร์ใน 10 นาทีที่ผ่านมา
+            if (state.realMode) clearStaleNodes(new Set());
+            setConnectionStatus('nodata');
+            return;
+        }
+        switchToRealData();
+        state.connectionStatus = 'online';
+        rows.forEach(applyApiReading);
+        clearStaleNodes(new Set(rows.map(r => r.nodeId)));
+        setConnectionStatus('online');
+        // ข้อมูลใหม่เข้ามา → ให้กราฟย้อนหลังโหลดใหม่ในรอบถัดไป
+        apiHistory.expireRecent();
+    } catch (err) {
+        apiState.lastError = err;
+        console.warn('[API]', err.message || err);
+        if (state.realMode) clearStaleNodes(new Set());
+        setConnectionStatus('error');
+    } finally {
+        apiState.busy = false;
+    }
+}
+
+// ใช้พิกัดจาก /api/buildings (เปิดได้ที่ config.js → useApiCoordinates)
+async function applyApiCoordinates() {
+    if (!API.enabled || !API.config?.useApiCoordinates) return;
+    try {
+        const list = await API.buildings();
+        list.forEach(b => {
+            const node = SENSOR_NODES.find(n => n.id === b.nodeId);
+            if (!node || !Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return;
+            node.lat = b.lat;
+            node.lng = b.lon;
+            state.markers[node.id]?.setLatLng([b.lat, b.lon]);
+        });
+    } catch (err) {
+        console.warn('[API] buildings:', err.message || err);
+    }
+}
+
+function startApiPolling() {
+    setConnectionStatus('connecting');
+    applyApiCoordinates();
+    pollApi();
+    apiState.timer = setInterval(pollApi, API.pollMs);
+    // กลับมาที่แท็บ → ดึงค่าใหม่ทันที
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && (!apiState.lastOk || Date.now() - apiState.lastOk > 15000)) pollApi();
+    });
+}
+
+// ข้อมูลย้อนหลังจาก API (เก็บไว้ชั่วคราว 5 นาที)
+const apiHistory = {
+    TTL: 5 * 60 * 1000,
+    cache: new Map(),
+    pending: new Set(),
+    key(nodeId, days) { return `${nodeId || 'all'}|${days}`; },
+    // คืนแถวที่มีอยู่ (หรือ null ถ้ายังไม่เคยโหลด) และสั่งโหลดใหม่เบื้องหลังเมื่อหมดอายุ แล้วเรียก onReady
+    get(nodeId, days, onReady) {
+        if (!API.enabled) return null;
+        const key = this.key(nodeId, days);
+        const hit = this.cache.get(key);
+        if ((!hit || Date.now() - hit.at > this.TTL) && !this.pending.has(key)) {
+            this.pending.add(key);
+            const deviceId = nodeId ? API.deviceIdFor(nodeId) : undefined;
+            API.history(days * 24, { deviceId })
+                .then(res => {
+                    this.cache.set(key, { at: Date.now(), rows: res.rows.map(apiRowToHistory).filter(Boolean) });
+                })
+                .catch(err => {
+                    console.warn('[API] history:', err.message || err);
+                    // ลองใหม่ใน 1 นาที โดยยังใช้ข้อมูลเดิม (ถ้ามี)
+                    this.cache.set(key, { at: Date.now() - this.TTL + 60000, rows: hit ? hit.rows : null });
+                })
+                .finally(() => {
+                    this.pending.delete(key);
+                    if (typeof onReady === 'function') onReady();
+                });
+        }
+        return hit ? hit.rows : null;
+    },
+    // ช่วง 1 วันเปลี่ยนเร็ว ให้หมดอายุทุก 2 นาที
+    expireRecent() {
+        this.cache.forEach((v, k) => {
+            if (k.endsWith('|1') && Date.now() - v.at > 2 * 60 * 1000) v.at = 0;
+        });
+    },
+};
+
+function apiRowToHistory(r) {
+    if (r.pm25 === null && r.temperature === null && r.humidity === null) return null;
+    return {
+        nodeId: r.nodeId,
+        timestamp: new Date(r.t).toISOString(),
+        pm25: r.pm25,
+        pm1: r.pm1,
+        pm10: r.pm10,
+        temperature: r.temperature,
+        humidity: r.humidity,
+        lux: r.lux,
+    };
 }
 
 // ===== Discord Alert =====
@@ -1024,16 +1240,7 @@ function connectMQTT() {
 
     state.client.on('message', (topic, message) => {
         // ได้ข้อมูลจริงแล้ว → หยุดโหมดจำลอง
-        const realData = () => {
-            if (!simulationInterval) return;
-            stopSimulation();
-            // ล้างค่าจำลองของทุกจุด ให้เหลือเฉพาะค่าจริง
-            SENSOR_NODES.forEach(n => {
-                n.data.pm25 = null; n.data.temperature = null; n.data.humidity = null; n.data.lastUpdate = null;
-                if (typeof updateMarker === 'function') updateMarker(n.id);
-            });
-        };
-        if (SENSOR_NODES.some(n => n.id === topic.split('/')[1])) realData();
+        if (SENSOR_NODES.some(n => n.id === topic.split('/')[1])) switchToRealData();
         const prefix = MQTT_CONFIG.topicPrefix;
         const parts = topic.split('/');
 
@@ -1090,7 +1297,7 @@ function connectMQTT() {
         if (state.connected) {
             state.connected = false;
             showToast('ขาดการเชื่อมต่อ MQTT', 'warning');
-            startSimulation();
+            if (!state.realMode) startSimulation();
         }
         setConnectionStatus('offline');
     });
@@ -1108,7 +1315,7 @@ function disconnectMQTT() {
         state.connected = false;
         showToast('ตัดการเชื่อมต่อ MQTT', 'info');
         setConnectionStatus('offline');
-        startSimulation();
+        if (!state.realMode) startSimulation();
     }
 }
 
@@ -1158,6 +1365,9 @@ function recordHistory(node) {
 
 function getHistoryRows(nodeId, days = state.historyRange) {
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    // มี API → ใช้ข้อมูลจาก InfluxDB ของ Aerolink (ถ้าโหลดไม่ได้ ใช้ข้อมูลที่เบราว์เซอร์เก็บไว้แทน)
+    const apiRows = apiHistory.get(nodeId, days, () => { if (state.selectedNodeId === nodeId) renderHistoryChart(); });
+    if (apiRows) return apiRows.filter(row => new Date(row.timestamp).getTime() >= cutoff);
     return loadHistory()
         .filter(row => row.nodeId === nodeId && new Date(row.timestamp).getTime() >= cutoff)
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -1185,8 +1395,34 @@ function formatHistoryCoverage(duration) {
     return `${days} วัน`;
 }
 
+// เฉลี่ยทุกจุดตรวจวัดในแต่ละช่วงเวลา (ข้ามค่าที่ว่าง)
+function averageRowsByBucket(rows, bucketMs) {
+    const buckets = new Map();
+    rows.forEach(row => {
+        const t = new Date(row.timestamp).getTime();
+        if (!Number.isFinite(t)) return;
+        const k = Math.floor(t / bucketMs) * bucketMs;
+        if (!buckets.has(k)) buckets.set(k, []);
+        buckets.get(k).push(row);
+    });
+    const avg = (list, key) => {
+        const vals = list.map(r => r[key]).filter(v => v !== null && v !== undefined && Number.isFinite(Number(v))).map(Number);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([t, list]) => ({
+        timestamp: new Date(t).toISOString(),
+        pm25: avg(list, 'pm25'),
+        temperature: avg(list, 'temperature'),
+        humidity: avg(list, 'humidity'),
+    })).filter(r => r.pm25 !== null && r.temperature !== null && r.humidity !== null);
+}
+
 function getOverviewHistoryRows(days = state.overviewHistoryRange) {
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const apiRows = apiHistory.get(null, days, renderOverviewChart);
+    if (apiRows) {
+        return averageRowsByBucket(apiRows.filter(r => new Date(r.timestamp).getTime() >= cutoff), days <= 2 ? 5 * 60000 : 3600000);
+    }
     const buckets = new Map();
     loadHistory().filter(row => new Date(row.timestamp).getTime() >= cutoff).forEach(row => {
         const bucket = Math.floor(new Date(row.timestamp).getTime() / 20000) * 20000;
@@ -1237,7 +1473,8 @@ function renderHistoryChart() {
         { key: 'temperature', label: 'อุณหภูมิ', unit: '°C', color: '#f97316' },
         { key: 'humidity', label: 'ความชื้น', unit: '%RH', color: '#22d3ee' },
     ];
-    const rows = getHistoryRows(state.selectedNodeId);
+    const rows = getHistoryRows(state.selectedNodeId)
+        .filter(row => [row.pm25, row.temperature, row.humidity].every(v => v !== null && v !== undefined && Number.isFinite(Number(v))));
     const rangeText = `ย้อนหลัง ${state.historyRange} วัน`;
     if (dom.historyRangeLabel) {
         dom.historyRangeLabel.textContent = `${rangeText} · มี ${rows.length.toLocaleString('th-TH')} รายการ`;
@@ -1289,7 +1526,7 @@ function onNodeDataUpdate(nodeId) {
     updateMarker(nodeId);
     updateNodeList();
     updateOverview();
-    updateGlobalTimestamp();
+    updateGlobalTimestamp(SENSOR_NODES.find(n => n.id === nodeId)?.data.lastUpdate);
 
     // Update detail panel if this node is selected
     if (state.selectedNodeId === nodeId) {
@@ -1366,9 +1603,10 @@ document.addEventListener('keydown', (e) => {
 // ===== Data Export =====
 function exportCSV() {
     const selected = state.selectedNodeId;
+    const allApi = selected ? null : apiHistory.get(null, state.historyRange);
     const rows = selected
         ? getHistoryRows(selected)
-        : loadHistory()
+        : (allApi || loadHistory())
             .filter(row => new Date(row.timestamp).getTime() >= Date.now() - state.historyRange * 86400000)
             .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     if (!rows.length) {
@@ -1415,12 +1653,18 @@ function init() {
     renderOverviewChart();
     initCompareSources();
 
-    // โหมดจำลอง (ปิดอยู่ ดู USE_SIMULATION ด้านบน)
+    // โหมดจำลอง — หยุดเองเมื่อได้ข้อมูลจริง (ดู USE_SIMULATION ด้านบน)
     startSimulation();
 
-    // เชื่อมต่อ MQTT อัตโนมัติ
-    setConnectionStatus('connecting');
-    setTimeout(() => connectMQTT(), 300);
+    if (API.enabled) {
+        // แหล่งข้อมูลหลัก: Aerolink API (ตั้งค่า URL ที่ config.js)
+        console.info('[API] ใช้ข้อมูลจาก', API.baseUrl);
+        startApiPolling();
+    } else {
+        // สำรอง: MQTT
+        setConnectionStatus('connecting');
+        setTimeout(() => connectMQTT(), 300);
+    }
 
     // Hide loading screen after map is initialized
     setTimeout(() => {

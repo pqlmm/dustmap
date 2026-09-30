@@ -215,6 +215,20 @@
         'ข้อมูลรายชั่วโมงเลือกได้ไม่เกิน 31 วัน — ลองใช้ "รายวัน" แทน': 'Hourly data is limited to 31 days — try "Daily" instead',
         'ข้อมูลรายวันเลือกได้ไม่เกินประมาณ 1 ปี — ลองใช้ "รายเดือน" แทน': 'Daily data is limited to about 1 year — try "Monthly" instead',
         'กรุณาเลือกค่าที่ต้องการอย่างน้อย 1 รายการ': 'Please choose at least one measurement',
+
+        // Aerolink API
+        'รอ API': 'waiting for API',
+        'รอเซนเซอร์': 'waiting for sensors',
+        'เซนเซอร์ไม่ได้ส่งข้อมูล': 'Sensors not reporting',
+        'เซนเซอร์ไม่ได้ส่งข้อมูลใน 10 นาทีที่ผ่านมา': 'No sensor data in the last 10 minutes',
+        'เซนเซอร์ยังไม่ได้ส่งข้อมูลล่าสุด': 'No recent sensor readings',
+        'ความสว่าง': 'Light',
+        'กำลังโหลดข้อมูล…': 'Loading data…',
+        'แหล่งข้อมูล: Aerolink API': 'Source: Aerolink API',
+        'ช่วงก่อนหน้าใช้ข้อมูลจำลอง': 'earlier periods use simulated data',
+        'เชื่อมต่อ API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน': 'Cannot reach the API — showing locally stored data instead',
+        'เชื่อมต่อ API ไม่ได้ (เซิร์ฟเวอร์ปิด, URL เปลี่ยน หรือถูกบล็อก CORS)': 'Cannot reach the API (server off, URL changed or blocked by CORS)',
+        'API ตอบช้าเกินไป': 'The API took too long to respond',
     };
 
     // สถานที่ที่มาจาก API (ภาษาไทย)
@@ -229,7 +243,8 @@
     const RULES = [
         [/^อัปเดตล่าสุด:\s*(.+)$/, (m, a) => `Last updated: ${a}`],
         [/^อัปเดต\s+(.+)$/, (m, a) => `Updated ${a}`],
-        [/^ข้อมูลจำลอง · (.+)$/, (m, a) => `Simulated data · ${a}`],
+        [/^ข้อมูลจำลอง · (.+)$/, (m, a) => `Simulated data · ${tr(a)}`],
+        [/^ข้อมูลล่าสุด (.+)$/, (m, a) => `last data ${a}`],
         [/^กำลังเชื่อมต่อใหม่… · ข้อมูลล่าสุด (.+)$/, (m, a) => `Reconnecting… · last data ${a}`],
         [/^ขาดการเชื่อมต่อ · ข้อมูลล่าสุด (.+)$/, (m, a) => `Disconnected · last data ${a}`],
         [/^อากาศ(ดีมาก|ดี|ปานกลาง|เริ่มมีผลกระทบ|มีผลต่อสุขภาพ)$/, (m, a) => DICT[a]],

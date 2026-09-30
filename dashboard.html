@@ -89,6 +89,20 @@
 .compare-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; }
 .compare-legend span { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: .54rem; }
 .compare-legend i { display: block; width: 11px; height: 2px; border-radius: 2px; }
+
+        /* ===== PM1.0 / PM10 / ความสว่าง ในแผงรายละเอียด (Aerolink API) ===== */
+        .detail-extra { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+        .detail-extra[hidden] { display: none; }
+        .de-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid rgba(129,140,248,.16); border-radius: 7px; background: #111827; }
+        .de-label { color: #94a3b8; font-size: .68rem; font-weight: 500; }
+        .de-value { color: #e2e8f0; font: 600 .95rem var(--font-mono, monospace); font-variant-numeric: tabular-nums; }
+        .de-value small { margin-left: 4px; color: #64748b; font: 500 .62rem var(--font-sans, sans-serif); }
+        :root[data-theme="light"] .de-item { background: #f8fafc; border-color: rgba(99,102,241,.16); }
+        :root[data-theme="light"] .de-label { color: #64748b; }
+        :root[data-theme="light"] .de-value { color: #0f172a; }
+        .archive-source-note { margin: 0 0 10px; color: var(--text-muted, #94a3b8); font-size: .72rem; }
+        .archive-source-note.warn { color: #f59e0b; }
+        .archive-loading { padding: 32px 0; text-align: center; color: var(--text-muted, #94a3b8); font-size: .85rem; }
     </style>
     <script>try{if(localStorage.getItem('pkru_lang')==='en')document.documentElement.classList.add('i18n-pending')}catch(e){}</script>
     <style>.i18n-pending body{opacity:0;animation:i18nShow 0s 1.2s forwards}@keyframes i18nShow{to{opacity:1}}</style>
@@ -338,6 +352,7 @@
                 <span class="dc-status" id="detailHumStatus">--</span>
             </div>
         </div>
+        <div class="detail-extra" id="detailExtra" hidden></div>
         <div class="detail-health">
             <span class="dh-icon" id="detailHealthIcon"></span>
             <span class="dh-text" id="detailHealthText">รอข้อมูล</span>
@@ -410,6 +425,9 @@
                         <label><input type="checkbox" name="archiveMetric" value="pm25" checked><i style="background:#818cf8"></i>PM<sub>2.5</sub></label>
                         <label><input type="checkbox" name="archiveMetric" value="temperature"><i style="background:#f97316"></i>อุณหภูมิ</label>
                         <label><input type="checkbox" name="archiveMetric" value="humidity"><i style="background:#22d3ee"></i>ความชื้นสัมพัทธ์</label>
+                        <label><input type="checkbox" name="archiveMetric" value="pm1"><i style="background:#a78bfa"></i>PM<sub>1.0</sub></label>
+                        <label><input type="checkbox" name="archiveMetric" value="pm10"><i style="background:#f472b6"></i>PM<sub>10</sub></label>
+                        <label><input type="checkbox" name="archiveMetric" value="lux"><i style="background:#facc15"></i>ความสว่าง</label>
                     </fieldset>
 
                     <div class="archive-range">
@@ -448,6 +466,7 @@
                             ดาวน์โหลด CSV
                         </button>
                     </div>
+                    <p class="archive-source-note" id="archiveSource" hidden></p>
                     <div class="archive-summary" id="archiveSummary"></div>
                     <div class="archive-charts" id="archiveCharts"></div>
                     <div class="archive-table" id="archiveTable"></div>
@@ -458,12 +477,13 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="i18n.js?v=20260921h"></script>
-    <script src="config.js?v=20260921f"></script>
-    <script src="app.js?v=20260921f"></script>
+    <script src="i18n.js?v=20260930a"></script>
+    <script src="config.js?v=20260930a"></script>
+    <script src="api.js?v=20260930a"></script>
+    <script src="app.js?v=20260930a"></script>
     <!-- ข้อมูลจำลอง/ข้อมูลเก่า (ไม่บังคับ): สร้างไฟล์ history-mock.js ที่กำหนด window.PKRU_HISTORY_MOCK = [...] -->
     <script src="history-mock.js?v=20260921f"></script>
-    <script src="history-archive.js?v=20260921f"></script>
+    <script src="history-archive.js?v=20260930a"></script>
     <script src="mobile.js?v=20260921f"></script>
 </body>
 </html>
