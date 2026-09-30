@@ -1,0 +1,5 @@
+# ไม่อัปโฟลเดอร์/ไฟล์ที่ใช้ในเครื่องเท่านั้น
+Claude outputs/
+*.png.tmp
+Thumbs.db
+desktop.ini

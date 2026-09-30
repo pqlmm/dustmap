@@ -1438,10 +1438,51 @@ function getOverviewHistoryRows(days = state.overviewHistoryRange) {
     }));
 }
 
+// แกนเวลาจริง: กราฟครอบคลุมช่วงที่เลือกทั้งช่วง (ถ้ามีข้อมูลแค่บางส่วน ด้านซ้ายจะว่าง)
+// และตัดเส้นเมื่อข้อมูลขาดช่วง
+function timeSegments(rows, x, y, key) {
+    const times = rows.map(r => new Date(r.timestamp).getTime());
+    const steps = times.slice(1).map((t, i) => t - times[i]).filter(d => d > 0).sort((a, b) => a - b);
+    const typical = steps.length ? steps[Math.floor(steps.length / 2)] : 0;
+    const maxGap = Math.max(typical * 3, 20 * 60000);
+    const segs = [];
+    let cur = [];
+    rows.forEach((row, i) => {
+        const v = Number(row[key]);
+        if (row[key] === null || row[key] === undefined || !Number.isFinite(v)) { if (cur.length) segs.push(cur); cur = []; return; }
+        if (cur.length && times[i] - times[i - 1] > maxGap) { segs.push(cur); cur = []; }
+        cur.push(`${x(times[i]).toFixed(1)},${y(v).toFixed(1)}`);
+    });
+    if (cur.length) segs.push(cur);
+    return segs;
+}
+
+function formatRangeEdge(date, days) {
+    return days === 1
+        ? date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+}
+
+// ข้อความบอกว่ามีข้อมูลจริงกี่ชั่วโมง/วัน เมื่อยังไม่ครบช่วงที่เลือก
+function coverageNote(rows, days) {
+    const coverage = getHistoryCoverage(rows);
+    if (!coverage) return '';
+    const requested = days * 86400000;
+    if (coverage.duration >= requested - 90 * 60000) return '';
+    return `มีข้อมูล ${formatHistoryCoverage(coverage.duration)}`;
+}
+
 function renderOverviewChart() {
     if (!dom.overviewChart) return;
+    const days = state.overviewHistoryRange;
     const rows = getOverviewHistoryRows();
     if (dom.overviewChartEmpty) dom.overviewChartEmpty.classList.toggle('visible', rows.length < 2);
+    const axis = document.getElementById('overviewChartAxis');
+    const end = Date.now(), start = end - days * 86400000;
+    if (axis) {
+        const note = rows.length ? coverageNote(rows, days) : '';
+        axis.innerHTML = `<span>${formatRangeEdge(new Date(start), days)}</span><span class="oca-note">${note}</span><span>ตอนนี้</span>`;
+    }
     if (!rows.length) {
         dom.overviewChart.innerHTML = '';
         return;
@@ -1452,17 +1493,14 @@ function renderOverviewChart() {
         { key: 'temperature', color: '#f97316' },
         { key: 'humidity', color: '#22d3ee' },
     ];
-    const sampleStep = Math.max(1, Math.ceil(rows.length / 60));
-    const points = rows.filter((_, index) => index % sampleStep === 0 || index === rows.length - 1);
-    const upper = Math.max(100, Math.ceil(Math.max(...metrics.flatMap(metric => points.map(row => Number(row[metric.key])))) / 10) * 10);
+    const upper = Math.max(100, Math.ceil(Math.max(...metrics.flatMap(metric => rows.map(row => Number(row[metric.key])).filter(Number.isFinite))) / 10) * 10);
     const left = 6, right = 6, top = 7, bottom = 7, width = 290 - left - right, height = 120 - top - bottom;
-    const x = index => left + (points.length === 1 ? width / 2 : index / (points.length - 1) * width);
+    const x = t => left + Math.max(0, Math.min(1, (t - start) / (end - start))) * width;
     const y = value => top + (upper - Math.max(0, value)) / upper * height;
     const grid = [.25, .5, .75].map(position => `<line x1="${left}" y1="${top + height * position}" x2="${left + width}" y2="${top + height * position}" stroke="rgba(148,163,184,.13)" stroke-dasharray="2 3"/>`).join('');
-    const lines = metrics.map(metric => {
-        const line = points.map((row, index) => `${x(index).toFixed(1)},${y(Number(row[metric.key])).toFixed(1)}`).join(' ');
-        return `<polyline points="${line}" fill="none" stroke="${metric.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
-    }).join('');
+    const lines = metrics.map(metric => timeSegments(rows, x, y, metric.key).map(seg => seg.length > 1
+        ? `<polyline points="${seg.join(' ')}" fill="none" stroke="${metric.color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
+        : `<line x1="${seg[0].split(',')[0]}" y1="${seg[0].split(',')[1]}" x2="${seg[0].split(',')[0]}" y2="${seg[0].split(',')[1]}" stroke="${metric.color}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`).join('')).join('');
     dom.overviewChart.innerHTML = `${grid}${lines}`;
 }
 
@@ -1473,11 +1511,12 @@ function renderHistoryChart() {
         { key: 'temperature', label: 'อุณหภูมิ', unit: '°C', color: '#f97316' },
         { key: 'humidity', label: 'ความชื้น', unit: '%RH', color: '#22d3ee' },
     ];
+    const days = state.historyRange;
     const rows = getHistoryRows(state.selectedNodeId)
         .filter(row => [row.pm25, row.temperature, row.humidity].every(v => v !== null && v !== undefined && Number.isFinite(Number(v))));
-    const rangeText = `ย้อนหลัง ${state.historyRange} วัน`;
+    const note = coverageNote(rows, days);
     if (dom.historyRangeLabel) {
-        dom.historyRangeLabel.textContent = `${rangeText} · มี ${rows.length.toLocaleString('th-TH')} รายการ`;
+        dom.historyRangeLabel.textContent = [`ย้อนหลัง ${days} วัน`, note, `มี ${rows.length.toLocaleString('th-TH')} รายการ`].filter(Boolean).join(' · ');
     }
     if (dom.historyEmpty) dom.historyEmpty.classList.toggle('visible', rows.length < 2);
 
@@ -1488,30 +1527,34 @@ function renderHistoryChart() {
     }
 
     // ลดจำนวนจุดที่วาดเพื่อรักษาความลื่นไหลบนช่วง 30 วัน
-    const maxPoints = 90;
+    const maxPoints = 240;
     const step = Math.max(1, Math.ceil(rows.length / maxPoints));
     const points = rows.filter((_, index) => index % step === 0 || index === rows.length - 1);
     const values = metrics.flatMap(metric => points.map(row => Number(row[metric.key]))).filter(Number.isFinite);
     const upper = Math.max(100, Math.ceil(Math.max(...values) / 10) * 10);
     const left = 36, right = 10, top = 12, bottom = 28, width = 580 - left - right, height = 180 - top - bottom;
-    const x = index => left + (points.length === 1 ? width / 2 : index / (points.length - 1) * width);
+    const end = Date.now(), start = end - days * 86400000;
+    const x = t => left + Math.max(0, Math.min(1, (t - start) / (end - start))) * width;
     const y = value => top + (upper - Math.max(0, value)) / upper * height;
     const grid = [0, .5, 1].map(position => {
         const value = upper - upper * position;
         const gridY = top + height * position;
         return `<line x1="${left}" y1="${gridY}" x2="${left + width}" y2="${gridY}" stroke="rgba(148,163,184,.18)" stroke-dasharray="3 4"/><text x="0" y="${gridY + 4}" fill="#64748b" font-size="10">${value.toFixed(0)}</text>`;
     }).join('');
-    const labels = [points[0], points[points.length - 1]].map((row, index) => {
-        const date = new Date(row.timestamp);
-        const text = state.historyRange === 1
-            ? date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-            : date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-        return `<text x="${index === 0 ? left : left + width}" y="174" text-anchor="${index === 0 ? 'start' : 'end'}" fill="#64748b" font-size="10">${text}</text>`;
-    }).join('');
+    // ป้ายแกนเวลา: ต้นช่วง / กลางช่วง / ตอนนี้
+    const labels = [[start, 'start'], [start + (end - start) / 2, 'middle'], [end, 'end']].map(([t, anchor]) =>
+        `<text x="${x(t).toFixed(1)}" y="174" text-anchor="${anchor}" fill="#64748b" font-size="10">${t === end ? 'ตอนนี้' : formatRangeEdge(new Date(t), days)}</text>`).join('');
+    const showDots = points.length <= 60;
     const lines = metrics.map(metric => {
-        const line = points.map((row, index) => `${x(index).toFixed(1)},${y(Number(row[metric.key])).toFixed(1)}`).join(' ');
-        const dots = points.map((row, index) => `<circle cx="${x(index)}" cy="${y(Number(row[metric.key]))}" r="${points.length === 1 ? 4 : 2}" fill="${metric.color}"><title>${metric.label} · ${new Date(row.timestamp).toLocaleString('th-TH')}: ${Number(row[metric.key]).toFixed(1)} ${metric.unit}</title></circle>`).join('');
-        return `<polyline points="${line}" fill="none" stroke="${metric.color}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+        const segs = timeSegments(points, x, y, metric.key);
+        const paths = segs.map(seg => seg.length > 1
+            ? `<polyline points="${seg.join(' ')}" fill="none" stroke="${metric.color}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>`
+            : `<circle cx="${seg[0].split(',')[0]}" cy="${seg[0].split(',')[1]}" r="3" fill="${metric.color}"/>`).join('');
+        const dots = showDots ? points.map(row => {
+            const t = new Date(row.timestamp).getTime();
+            return `<circle cx="${x(t).toFixed(1)}" cy="${y(Number(row[metric.key])).toFixed(1)}" r="2" fill="${metric.color}"><title>${metric.label} · ${new Date(t).toLocaleString('th-TH')}: ${Number(row[metric.key]).toFixed(1)} ${metric.unit}</title></circle>`;
+        }).join('') : '';
+        return paths + dots;
     }).join('');
 
     dom.historyChart.innerHTML = `${grid}${lines}${labels}`;

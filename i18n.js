@@ -229,6 +229,9 @@
         'เชื่อมต่อ API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน': 'Cannot reach the API — showing locally stored data instead',
         'เชื่อมต่อ API ไม่ได้ (เซิร์ฟเวอร์ปิด, URL เปลี่ยน หรือถูกบล็อก CORS)': 'Cannot reach the API (server off, URL changed or blocked by CORS)',
         'API ตอบช้าเกินไป': 'The API took too long to respond',
+        'ดึงข้อมูลย้อนหลังจาก API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน': 'Could not load history from the API — showing locally stored data instead',
+        'เปิดดูคำตอบจากเซิร์ฟเวอร์': 'Open the server response',
+        'ข้อมูลจาก API ไม่ใช่ JSON': 'The API response is not JSON',
     };
 
     // สถานที่ที่มาจาก API (ภาษาไทย)
@@ -245,6 +248,7 @@
         [/^อัปเดต\s+(.+)$/, (m, a) => `Updated ${a}`],
         [/^ข้อมูลจำลอง · (.+)$/, (m, a) => `Simulated data · ${tr(a)}`],
         [/^ข้อมูลล่าสุด (.+)$/, (m, a) => `last data ${a}`],
+        [/^API ตอบกลับ (\d+)$/, (m, n) => `API responded with ${n}`],
         [/^กำลังเชื่อมต่อใหม่… · ข้อมูลล่าสุด (.+)$/, (m, a) => `Reconnecting… · last data ${a}`],
         [/^ขาดการเชื่อมต่อ · ข้อมูลล่าสุด (.+)$/, (m, a) => `Disconnected · last data ${a}`],
         [/^อากาศ(ดีมาก|ดี|ปานกลาง|เริ่มมีผลกระทบ|มีผลต่อสุขภาพ)$/, (m, a) => DICT[a]],
@@ -257,6 +261,7 @@
         [/^ต่ำสุด ([^·]+)$/, (m, a) => `Min ${a}`],
         [/^สูงสุด ([^·]+)$/, (m, a) => `Max ${a}`],
         [/^มีข้อมูล ([\d,]+) จาก ([\d,]+) ช่วง$/, (m, a, b) => `${a} of ${b} periods with data`],
+        [/^มีข้อมูล (\d+ (?:นาที|ชั่วโมง|วัน))$/, (m, a) => `only ${tr(a)} of data`],
         [/^แสดง ([\d,]+) แถวล่าสุด — ดาวน์โหลด CSV เพื่อดูทั้งหมด$/, (m, n) => `Showing the latest ${n} rows — download CSV for all`],
         [/^แบบจำลอง$/, () => 'Model'],
         [/^\(?เฉลี่ย 24 ชม\.\)?$/, () => '(24-h average)'],

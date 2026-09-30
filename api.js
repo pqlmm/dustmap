@@ -61,20 +61,25 @@
         }
     }
 
-    async function request(path, params) {
+    async function request(path, params, timeoutMs = CFG.timeoutMs) {
         if (!BASE) throw new ApiError('config', 'ยังไม่ได้ตั้ง URL ของ API');
         const qs = new URLSearchParams();
         Object.entries(params || {}).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') qs.set(k, v); });
         const url = `${BASE}${path}${qs.toString() ? '?' + qs : ''}`;
 
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), CFG.timeoutMs);
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
         let res;
         try {
             res = await fetch(url, { cache: 'no-store', signal: ctrl.signal, headers: { Accept: 'application/json' } });
         } catch (err) {
-            if (err.name === 'AbortError') throw new ApiError('timeout', 'API ตอบช้าเกินไป');
-            throw new ApiError('network', 'เชื่อมต่อ API ไม่ได้ (เซิร์ฟเวอร์ปิด, URL เปลี่ยน หรือถูกบล็อก CORS)');
+            const e = err.name === 'AbortError'
+                ? new ApiError('timeout', 'API ตอบช้าเกินไป')
+                // หมายเหตุ: ถ้าเซิร์ฟเวอร์เกิด error ภายใน (500) หรือ Cloudflare หมดเวลารอ (524)
+                // คำตอบมักไม่มี header CORS เบราว์เซอร์จึงรายงานเป็น "เชื่อมต่อไม่ได้" แทน
+                : new ApiError('network', 'เชื่อมต่อ API ไม่ได้ (เซิร์ฟเวอร์ปิด, URL เปลี่ยน หรือถูกบล็อก CORS)');
+            e.url = url;
+            throw e;
         } finally {
             clearTimeout(timer);
         }
@@ -82,10 +87,12 @@
         let body = null;
         try { body = await res.json(); } catch { /* ไม่ใช่ JSON */ }
         if (!res.ok) {
-            const err = new ApiError(res.status === 404 ? 'nodata' : 'http', body?.detail || `API ตอบกลับ ${res.status}`, res.status);
+            const detail = typeof body?.detail === 'string' ? body.detail : '';
+            const err = new ApiError(res.status === 404 ? 'nodata' : 'http', detail || `API ตอบกลับ ${res.status}`, res.status);
+            err.url = url;
             throw err;
         }
-        if (body === null) throw new ApiError('parse', 'ข้อมูลจาก API ไม่ใช่ JSON');
+        if (body === null) { const e = new ApiError('parse', 'ข้อมูลจาก API ไม่ใช่ JSON'); e.url = url; throw e; }
         return body;
     }
 
@@ -169,12 +176,24 @@
         // ข้อมูลย้อนหลัง (hours > 48 ระบบของเพื่อนจะส่งเป็นค่าเฉลี่ยรายชั่วโมง)
         async history(hours = 24, opts = {}) {
             const h = Math.max(1, Math.min(35000, Math.ceil(hours)));
+            const fields = toApiFields(opts.fields);
+            // ข้อมูลย้อนหลังช่วงยาวใช้เวลานานกว่า ให้รอได้นานขึ้น
+            const timeout = Math.max(CFG.timeoutMs, h > 48 ? 60000 : 30000);
             let body;
             try {
-                body = await request('/api/history', { hours: h, device_id: opts.deviceId, fields: toApiFields(opts.fields) });
+                body = await request('/api/history', { hours: h, device_id: opts.deviceId, fields }, timeout);
             } catch (err) {
                 if (err.kind === 'nodata') return { resolution: null, rows: [] };
-                throw err;
+                // ลองใหม่อีกครั้งโดยไม่ระบุ fields (แบบเดียวกับกราฟหน้าหลักที่ใช้ได้ปกติ)
+                if (!fields || err.kind === 'timeout') throw err;
+                console.warn('[API] history with fields failed, retrying without fields:', err.message);
+                try {
+                    body = await request('/api/history', { hours: h, device_id: opts.deviceId }, timeout);
+                } catch (err2) {
+                    if (err2.kind === 'nodata') return { resolution: null, rows: [] };
+                    err2.firstError = err;
+                    throw err2;
+                }
             }
             const data = Array.isArray(body) ? body : (body?.data || []);
             const rows = data.map(normalize)

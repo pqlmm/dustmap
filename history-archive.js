@@ -80,7 +80,7 @@
                 hit = { at: Date.now(), rows: res.rows, resolution: res.resolution };
                 st.apiCache.set(key, hit);
             } catch (err) {
-                console.warn('[API] archive:', err.message || err);
+                console.warn('[API] archive:', err.kind, err.status || '', err.message || err, err.url || '');
                 st.allRows = null;
                 return { rows: getAllRows(), source: 'fallback', error: err };
             }
@@ -311,9 +311,27 @@
             text = 'แหล่งข้อมูล: Aerolink API';
             if (loaded.hasMock) text += ' · ช่วงก่อนหน้าใช้ข้อมูลจำลอง';
         } else if (loaded.source === 'fallback') {
-            text = 'เชื่อมต่อ API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน';
+            text = 'ดึงข้อมูลย้อนหลังจาก API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน';
         }
         el.textContent = text;
+        // บอกสาเหตุ + ลิงก์ให้เปิดดูคำตอบจริงจากเซิร์ฟเวอร์ (เปิดตรงในแท็บใหม่ ไม่ติด CORS)
+        const err = loaded.error;
+        if (loaded.source === 'fallback' && err) {
+            const reason = document.createElement('span');
+            reason.className = 'archive-source-reason';
+            reason.textContent = err.message || String(err);
+            el.appendChild(document.createElement('br'));
+            el.appendChild(reason);
+            if (err.url) {
+                el.appendChild(document.createTextNode(' '));
+                const a = document.createElement('a');
+                a.href = err.url;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.textContent = 'เปิดดูคำตอบจากเซิร์ฟเวอร์';
+                el.appendChild(a);
+            }
+        }
         el.classList.toggle('warn', loaded.source === 'fallback');
         el.hidden = !text;
     }
