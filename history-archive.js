@@ -461,21 +461,35 @@
             (rows.length > LIMIT ? `<p class="archive-note">แสดง ${LIMIT.toLocaleString('th-TH')} แถวล่าสุด — ดาวน์โหลด CSV เพื่อดูทั้งหมด</p>` : '');
     }
 
+    // CSV ตรงกับตาราง/กราฟที่แสดง: ช่วงเวลาเดียวกัน ค่าที่เลือก จุดตรวจวัดเดียวกัน
+    const CSV_COL = {
+        pm25: 'pm2_5_ugm3', pm1: 'pm1_0_ugm3', pm10: 'pm10_ugm3',
+        temperature: 'temperature_c', humidity: 'humidity_pct', lux: 'lux',
+    };
     function downloadCSV() {
         const r = st.result;
         if (!r) return;
-        const cols = r.metrics.flatMap(k => [`${k}_avg`, `${k}_min`, `${k}_max`]);
-        const lines = [['period_start', 'period_label', ...cols, 'samples'].join(',')];
+        const station = r.nodeId === 'all'
+            ? 'ทุกจุดตรวจวัด (ค่าเฉลี่ย)'
+            : (SENSOR_NODES.find(n => n.id === r.nodeId)?.name || r.nodeId);
+        const deviceId = r.nodeId === 'all' ? 'all' : ((API.deviceIdFor && API.deviceIdFor(r.nodeId)) || r.nodeId);
+        const source = st.source?.source === 'api' ? 'Aerolink API' : 'browser/mock';
+        const esc = v => { const t = String(v ?? ''); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+        const stamp = t => { const d = new Date(t); return `${toDateInput(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+        const cols = r.metrics.flatMap(k => [`${CSV_COL[k] || k}_avg`, `${CSV_COL[k] || k}_min`, `${CSV_COL[k] || k}_max`]);
+        const lines = [['period_start', 'period_end', 'period_label', 'device_id', 'location', ...cols, 'samples', 'source'].join(',')];
         r.rows.forEach(row => {
-            const d = new Date(row.t);
-            const iso = `${toDateInput(d)} ${pad(d.getHours())}:00`;
-            const vals = r.metrics.flatMap(k => row[k] ? [row[k].avg.toFixed(2), row[k].min.toFixed(2), row[k].max.toFixed(2)] : ['', '', '']);
-            lines.push([iso, `"${fmtBucket(row.t, r.mode)}"`, ...vals, row.count].join(','));
+            const vals = r.metrics.flatMap(k => {
+                const m = METRICS.find(x => x.key === k);
+                const v = row[k];
+                return v ? [v.avg, v.min, v.max].map(x => x.toFixed(m.digits)) : ['', '', ''];
+            });
+            lines.push([stamp(row.t), stamp(nextBucket(row.t, r.mode)), fmtBucket(row.t, r.mode), deviceId, station, ...vals, row.count, source].map(esc).join(','));
         });
-        const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `pkru-history-${r.mode}-${r.nodeId}-${toDateInput(new Date(r.start))}.csv`;
+        a.download = `PKRU_AQI_${deviceId}_${r.mode}_${toDateInput(new Date(r.start)).replace(/-/g, '')}-${toDateInput(new Date(r.end - 1)).replace(/-/g, '')}.csv`;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);

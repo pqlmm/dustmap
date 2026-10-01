@@ -1643,45 +1643,96 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// ===== Data Export =====
-function exportCSV() {
+// ===== Data Export (CSV) =====
+// ใช้ข้อมูลชุดเดียวกับกราฟ: ดึงจาก API ใหม่ (ทุกค่า: PM1.0/PM2.5/PM10/อุณหภูมิ/ความชื้น/ความสว่าง)
+// ถ้า API ใช้ไม่ได้ ใช้ข้อมูลที่เบราว์เซอร์เก็บไว้แทน — เวลาเป็นเวลาไทย (UTC+7) พร้อมคอลัมน์ UTC
+function pad2(n) { return String(n).padStart(2, '0'); }
+function bangkokTimeText(date) {
+    const d = new Date(date.getTime() + 7 * 3600000);
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
+}
+
+async function loadRowsForCSV(nodeId, days) {
+    if (API.enabled) {
+        try {
+            const res = await API.history(days * 24, { deviceId: nodeId ? API.deviceIdFor(nodeId) : undefined });
+            const rows = res.rows.map(apiRowToHistory).filter(Boolean);
+            return { rows, source: 'Aerolink API', resolution: res.resolution };
+        } catch (err) {
+            console.warn('[CSV] API history failed, using local data:', err.message || err);
+        }
+    }
+    const cutoff = Date.now() - days * 86400000;
+    const rows = loadHistory()
+        .filter(row => (!nodeId || row.nodeId === nodeId) && new Date(row.timestamp).getTime() >= cutoff);
+    return { rows, source: 'browser', resolution: null };
+}
+
+async function exportCSV() {
     const selected = state.selectedNodeId;
-    const allApi = selected ? null : apiHistory.get(null, state.historyRange);
-    const rows = selected
-        ? getHistoryRows(selected)
-        : (allApi || loadHistory())
-            .filter(row => new Date(row.timestamp).getTime() >= Date.now() - state.historyRange * 86400000)
-            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const days = state.historyRange;
+    const btn = dom.historyDownload;
+    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+    let loaded;
+    try {
+        loaded = await loadRowsForCSV(selected, days);
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    }
+    const rows = loaded.rows
+        .filter(row => Number.isFinite(new Date(row.timestamp).getTime()))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp) || String(a.nodeId).localeCompare(String(b.nodeId)));
     if (!rows.length) {
+        if (dom.historySummary) dom.historySummary.textContent = 'ยังไม่มีข้อมูลย้อนหลังสำหรับดาวน์โหลด';
         showToast('ยังไม่มีข้อมูลย้อนหลังสำหรับดาวน์โหลด', 'warning');
         return;
     }
-    const csvEscape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    let csv = '\uFEFFTimestamp,Location,PM2.5(µg/m3),Temperature(°C),Humidity(%RH),AQI_Status\n';
+
+    const csvEscape = value => {
+        const text = String(value ?? '');
+        return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const fmt = (v, digits) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? '' : Number(v).toFixed(digits);
+    const header = [
+        'datetime_bangkok', 'timestamp_utc', 'device_id', 'location',
+        'pm1_0_ugm3', 'pm2_5_ugm3', 'pm10_ugm3', 'temperature_c', 'humidity_pct', 'lux', 'aqi_level',
+    ];
+    const lines = [header.join(',')];
     rows.forEach(row => {
+        const t = new Date(row.timestamp);
         const node = SENSOR_NODES.find(item => item.id === row.nodeId);
-        const aqi = getAQILevel(Number(row.pm25));
-        csv += [row.timestamp, node ? node.name : 'ไม่ทราบตำแหน่ง', Number(row.pm25).toFixed(1), Number(row.temperature).toFixed(1), Number(row.humidity).toFixed(1), aqi.text].map(csvEscape).join(',') + '\n';
+        const pm25 = row.pm25 === null || row.pm25 === undefined ? null : Number(row.pm25);
+        lines.push([
+            bangkokTimeText(t),
+            t.toISOString(),
+            (API.deviceIdFor && API.deviceIdFor(row.nodeId)) || row.nodeId,
+            node ? node.name : 'ไม่ทราบตำแหน่ง',
+            fmt(row.pm1, 1), fmt(pm25, 1), fmt(row.pm10, 1),
+            fmt(row.temperature, 1), fmt(row.humidity, 1), fmt(row.lux, 0),
+            Number.isFinite(pm25) ? getAQILevel(pm25).text : '',
+        ].map(csvEscape).join(','));
     });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+    const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    const dateNow = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const scope = selected || 'all-nodes';
-    link.setAttribute("download", `PKRU_AQI_${scope}_${state.historyRange}days_${dateNow}.csv`);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = bangkokTimeText(new Date()).slice(0, 10).replace(/-/g, '');
+    const scope = selected ? ((API.deviceIdFor && API.deviceIdFor(selected)) || selected) : 'all';
+    const res = loaded.resolution === '5min_mean' ? '_5min' : (loaded.resolution ? '_hourly' : '');
+    link.download = `PKRU_AQI_${scope}_${days}d${res}_${today}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
     const coverage = getHistoryCoverage(rows);
-    const requestedDuration = state.historyRange * 24 * 60 * 60 * 1000;
-    const hasFullCoverage = coverage && coverage.duration >= requestedDuration - 15 * 60 * 1000;
+    const hasFullCoverage = coverage && coverage.duration >= days * 86400000 - 90 * 60000;
     const coverageText = coverage ? formatHistoryCoverage(coverage.duration) : 'ไม่ทราบช่วงเวลา';
     showToast(
         hasFullCoverage
-            ? `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการย้อนหลัง ${state.historyRange} วันแล้ว`
-            : `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการ · มีข้อมูลจริง ${coverageText} (ยังไม่ครบ ${state.historyRange} วัน)`,
+            ? `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการย้อนหลัง ${days} วันแล้ว`
+            : `ดาวน์โหลด ${rows.length.toLocaleString('th-TH')} รายการ · มีข้อมูลจริง ${coverageText} (ยังไม่ครบ ${days} วัน)`,
         hasFullCoverage ? 'success' : 'warning',
         6000
     );

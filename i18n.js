@@ -231,6 +231,7 @@
         'API ตอบช้าเกินไป': 'The API took too long to respond',
         'ดึงข้อมูลย้อนหลังจาก API ไม่ได้ — แสดงข้อมูลที่มีในเครื่องแทน': 'Could not load history from the API — showing locally stored data instead',
         'เปิดดูคำตอบจากเซิร์ฟเวอร์': 'Open the server response',
+        'ยังไม่มีข้อมูลย้อนหลังสำหรับดาวน์โหลด': 'No history data to download yet',
         'ข้อมูลจาก API ไม่ใช่ JSON': 'The API response is not JSON',
     };
 
