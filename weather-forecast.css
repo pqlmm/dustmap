@@ -1,0 +1,309 @@
+/* =====================================================================
+   PKRU Air Quality — พยากรณ์อากาศและฝุ่นหน้าแรก (คู่กับ weather-forecast.js)
+   สีเดียวกับหน้าเว็บเดิม: พื้นกรมท่า #0b0f1a / #0d1225, การ์ด #111827, ม่วงคราม #818cf8 → ฟ้า #22d3ee
+   ===================================================================== */
+.forecast-section {
+    position: relative;
+    padding: 88px max(20px, env(safe-area-inset-right)) 96px max(20px, env(safe-area-inset-left));
+    background: #0d1225;
+    border-top: 1px solid rgba(129, 140, 248, .1);
+    color: #f1f5f9;
+}
+.forecast-container { max-width: 1180px; margin: 0 auto; }
+
+/* หัวข้อ */
+.fc-head { margin-bottom: 30px; text-align: center; }
+.fc-head .section-subtext { margin: 0 auto; max-width: 640px; }
+
+/* ---------- แท็บรายวัน ---------- */
+.fc-tabs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.fc-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+    padding: 0 18px;
+    border: 1px solid rgba(129, 140, 248, .16);
+    border-radius: 12px;
+    background: #111827;
+    color: #f1f5f9;
+    font: 500 1.12rem var(--font-sans, sans-serif);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background .15s ease, border-color .15s ease;
+}
+.fc-tab:hover { background: #141d2f; border-color: rgba(129, 140, 248, .32); }
+.fc-tab.active { border-color: transparent; background: linear-gradient(135deg, #818cf8, #22d3ee); color: #fff; box-shadow: 0 8px 24px rgba(99, 102, 241, .28); }
+.fc-tab:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+.fc-tab-temp { font-variant-numeric: tabular-nums; }
+.fc-tab-temp sup { font-size: .7em; margin-left: 1px; }
+.fc-tab .fc-icon { width: 30px; height: 30px; }
+.fc-tab-pm {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, .08);
+    color: #e2e8f0;
+    font-size: .74rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.fc-tab-pm i { width: 7px; height: 7px; border-radius: 50%; background: var(--pm); }
+.fc-tab.active .fc-tab-pm { background: rgba(11, 15, 26, .35); color: #fff; }
+
+/* ---------- เค้าโครง ---------- */
+.fc-grid { display: grid; grid-template-columns: minmax(300px, 450px) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+
+/* การ์ดตอนนี้ */
+.fc-now {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border: 1px solid rgba(129, 140, 248, .16);
+    border-radius: 20px;
+    background: #111827;
+}
+.fc-photo {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1;
+    min-height: 312px;
+    padding: 18px 18px 20px;
+    overflow: hidden;
+    border-radius: 14px;
+    color: #fff;
+    background: #0b0f1a url('hero-bg.jpg') center 50% / cover no-repeat;
+    isolation: isolate;
+}
+.fc-photo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(7, 12, 22, .35), rgba(7, 12, 22, .82));
+}
+.fc-sky-clear::before { background: linear-gradient(180deg, rgba(34, 211, 238, .12), rgba(7, 12, 22, .78)); }
+.fc-sky-partly::before { background: linear-gradient(180deg, rgba(129, 140, 248, .14), rgba(7, 12, 22, .8)); }
+.fc-sky-cloud::before, .fc-sky-fog::before { background: linear-gradient(180deg, rgba(100, 116, 139, .35), rgba(7, 12, 22, .82)); }
+.fc-sky-drizzle::before, .fc-sky-rain::before, .fc-sky-shower::before { background: linear-gradient(180deg, rgba(30, 41, 59, .55), rgba(7, 12, 22, .86)); }
+.fc-sky-heavy::before, .fc-sky-thunder::before { background: linear-gradient(180deg, rgba(15, 23, 42, .7), rgba(7, 12, 22, .9)); }
+.fc-photo.is-night::before { background: linear-gradient(180deg, rgba(11, 15, 26, .72), rgba(7, 12, 22, .9)); }
+.fc-photo-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fc-clock { margin-left: auto; font-size: 1.05rem; text-shadow: 0 1px 6px rgba(0, 0, 0, .4); }
+.fc-src {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 99px;
+    background: rgba(11, 15, 26, .6);
+    border: 1px solid rgba(148, 163, 184, .22);
+    font-size: .76rem;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.fc-src i { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; }
+.fc-src.is-live i { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, .3); animation: fcPulse 2s ease-in-out infinite; }
+@keyframes fcPulse { 50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
+.fc-photo-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.fc-big-wrap { display: flex; flex-direction: column; text-shadow: 0 2px 16px rgba(0, 0, 0, .35); }
+.fc-big-label { font-size: .95rem; font-weight: 600; opacity: .9; }
+.fc-big { font-size: clamp(3.4rem, 5.6vw, 4.4rem); font-weight: 300; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.fc-big-unit { margin-top: 4px; font-size: .85rem; opacity: .85; }
+.fc-big-wrap::after { content: ''; width: 64px; height: 5px; margin-top: 10px; border-radius: 99px; background: var(--aqi, #64748b); box-shadow: 0 0 14px var(--aqi, transparent); }
+.fc-desc { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 58%; text-align: right; text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
+.fc-level { padding: 4px 12px; border-radius: 99px; background: var(--aqi, #64748b); color: #0b0f1a; font-size: 1.05rem; font-weight: 600; text-shadow: none; }
+.fc-desc span { font-size: .95rem; line-height: 1.4; }
+.fc-sky-text { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: .9rem !important; opacity: .95; }
+.fc-sky-text .fc-icon { width: 26px; height: 26px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
+
+.fc-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 16px; }
+.fc-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 86px;
+    padding: 10px 6px;
+    border: 1px solid rgba(129, 140, 248, .1);
+    border-radius: 12px;
+    background: #172033;
+    text-align: center;
+}
+.fc-tile-label { display: inline-flex; align-items: center; gap: 6px; color: #94a3b8; font-size: .9rem; }
+.fc-tile-label svg { width: 17px; height: 17px; flex-shrink: 0; color: #818cf8; }
+.fc-tile-value { color: #f1f5f9; font-size: .95rem; font-weight: 600; }
+.fc-tile small { margin-top: -4px; color: #64748b; font-size: .72rem; }
+
+/* การ์ดรายชั่วโมง */
+.fc-hourly {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid rgba(129, 140, 248, .16);
+    border-radius: 20px;
+    background: #111827;
+}
+.fc-hourly-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 16px; }
+.fc-hourly h3 { margin: 4px 0 0; color: #f1f5f9; font-size: 1.2rem; font-weight: 600; }
+.fc-mode { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: #0b0f1a; border: 1px solid rgba(148, 163, 184, .12); }
+.fc-mode button {
+    min-height: 32px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    font: 600 .82rem var(--font-sans, sans-serif);
+    cursor: pointer;
+}
+.fc-mode button:hover { color: #f1f5f9; }
+.fc-mode button[aria-pressed="true"] { background: rgba(129, 140, 248, .2); border-color: rgba(129, 140, 248, .5); color: #c7d2fe; }
+.fc-mode button:focus-visible { outline: 2px solid #818cf8; outline-offset: 1px; }
+.fc-scroll { overflow-x: auto; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.fc-track { min-width: calc(var(--fc-cols, 9) * 68px); }
+.fc-chart-box {
+    position: relative;
+    height: 252px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 14px;
+    background: #0b0f1a;
+    overflow: hidden;
+}
+.fc-chart { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fc-line { fill: none; stroke: #f97316; stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.fc-line.is-pm { stroke: #818cf8; }
+.fc-area { fill: rgba(249, 115, 22, .08); stroke: none; }
+.fc-band { fill: rgba(129, 140, 248, .18); stroke: none; }
+.fc-guide { stroke-width: 1; stroke-dasharray: 4 5; opacity: .45; vector-effect: non-scaling-stroke; }
+.fc-guide.is-watch { opacity: .8; stroke-dasharray: 7 4; }
+.fc-pmdot { stroke: #0b0f1a; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.fc-pmdot.is-measured { stroke: #f1f5f9; }
+.fc-chart-legend {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b;
+    font-size: .7rem;
+}
+.fc-legend-band { width: 16px; height: 8px; border-radius: 2px; background: rgba(129, 140, 248, .3); }
+.fc-legend-watch { width: 16px; height: 0; margin-left: 8px; border-top: 2px dashed #eab308; }
+.fc-rain-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    display: grid;
+    grid-template-columns: repeat(var(--fc-cols, 9), 1fr);
+}
+.fc-rain-row span { display: flex; justify-content: center; }
+.fc-rain {
+    padding: 6px 10px 8px;
+    border-radius: 12px 12px 0 0;
+    background: #172033;
+    color: #cbd5e1;
+    font-size: .72rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.fc-rain.is-strong { background: rgba(34, 211, 238, .16); color: #67e8f9; }
+
+.fc-hours { display: grid; grid-template-columns: repeat(var(--fc-cols, 9), 1fr); gap: 6px; }
+.fc-hour {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 22px 4px 12px;
+    border: 1px solid rgba(129, 140, 248, .1);
+    border-radius: 12px;
+    background: #172033;
+}
+.fc-hour-time { margin-bottom: 8px; color: #cbd5e1; font-size: 1.05rem; white-space: nowrap; }
+.fc-hour .fc-icon { width: 30px; height: 30px; }
+.fc-hour.is-now { background: rgba(129, 140, 248, .14); border-color: #818cf8; }
+.fc-hour.is-now .fc-hour-time { color: #a5b4fc; font-weight: 700; }
+.fc-hour-main {
+    position: relative;
+    margin-top: 6px;
+    color: #f1f5f9;
+    font-size: 1.6rem;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+}
+.fc-hour-main:not(.is-temp)::after { content: ''; display: block; width: 28px; height: 4px; margin: 3px auto 0; border-radius: 99px; background: var(--pm); }
+.fc-hour-sub { display: inline-flex; align-items: center; gap: 4px; color: #94a3b8; font-size: .8rem; white-space: nowrap; }
+.fc-hour-sub i { width: 7px; height: 7px; border-radius: 50%; }
+.fc-method { margin: 12px 2px 0; color: #94a3b8; font-size: .76rem; line-height: 1.6; }
+.fc-source { margin-top: 14px; color: #64748b; font-size: .76rem; text-align: right; }
+
+/* สถานะโหลด / ผิดพลาด */
+.fc-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 200px;
+    padding: 24px;
+    border: 1px solid rgba(129, 140, 248, .16);
+    border-radius: 20px;
+    background: #111827;
+    color: #94a3b8;
+    text-align: center;
+}
+.fc-error { color: #fda4af; }
+.fc-retry {
+    min-height: 40px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #818cf8, #22d3ee);
+    color: #fff;
+    font: 600 .9rem var(--font-sans, sans-serif);
+    cursor: pointer;
+}
+
+/* ---------- จอเล็ก ---------- */
+@media (max-width: 980px) {
+    .fc-grid { grid-template-columns: 1fr; }
+    .fc-now { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+    .fc-photo { flex: none; }
+    .fc-tiles { margin-top: 0; grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .forecast-section { padding-top: 56px; padding-bottom: 60px; }
+    .fc-tabs { flex-wrap: nowrap; gap: 8px; overflow-x: auto; margin: 0 -20px 12px; padding: 2px 20px 6px; scrollbar-width: none; }
+    .fc-tabs::-webkit-scrollbar { display: none; }
+    .fc-tab { flex-shrink: 0; min-height: 48px; padding: 0 14px; font-size: 1rem; }
+    .fc-now { display: block; padding: 12px; border-radius: 18px; }
+    .fc-photo { min-height: 250px; }
+    .fc-tiles { margin-top: 12px; grid-template-columns: repeat(3, 1fr); }
+    .fc-tile { min-height: 76px; }
+    .fc-tile-label { flex-direction: column; gap: 3px; font-size: .78rem; }
+    .fc-tile-value { font-size: .86rem; }
+    .fc-hourly { padding: 14px 12px; border-radius: 18px; }
+    .fc-hourly h3 { font-size: 1.1rem; margin-bottom: 12px; }
+    .fc-track { min-width: calc(var(--fc-cols, 9) * 72px); }
+    .fc-chart-box { height: 180px; }
+    .fc-hour { padding: 16px 2px 10px; }
+    .fc-hour-time { font-size: .9rem; }
+    .fc-hour-main { font-size: 1.35rem; }
+    .fc-chart-legend { display: none; }
+    .fc-desc { max-width: 62%; }
+    .fc-level { font-size: .92rem; }
+    .fc-source { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fc-tab, .fc-dot { transition: none; }
+}

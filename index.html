@@ -1,348 +1,413 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="ระบบตรวจวัดคุณภาพอากาศ มหาวิทยาลัยราชภัฏภูเก็ต — PM2.5, อุณหภูมิ, ความชื้น แบบเรียลไทม์">
-    <meta name="theme-color" content="#0b0f1a">
+    <meta name="theme-color" content="#060b12">
     <title>PKRU Air Quality — ระบบตรวจวัดคุณภาพอากาศ มรภ.ภูเก็ต</title>
+    <!-- ธีม: ตั้งก่อนวาดหน้า กันจอกระพริบ (ใช้ค่าเดียวกับแดชบอร์ด 'pkru_aqm_theme') -->
+    <script>(function(){var t='dark';try{var s=localStorage.getItem('pkru_aqm_theme');t=(s==='light'||s==='dark')?s:(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=t==='light'?'#f4f7f5':'#060b12'})();</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="landing.css?v=20260921g">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="weather-forecast.css?v=20261005a">
+    <link rel="stylesheet" href="site.css?v=20261005r2">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script>try{if(localStorage.getItem('pkru_lang')==='en')document.documentElement.classList.add('i18n-pending')}catch(e){}</script>
     <style>.i18n-pending body{opacity:0;animation:i18nShow 0s 1.2s forwards}@keyframes i18nShow{to{opacity:1}}</style>
 </head>
 <body>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-bg">
-            <img src="hero-bg.jpg" alt="PKRU Campus" />
-            <div class="hero-overlay"></div>
-        </div>
+    <!-- ===== Hero (Aurora Background) ===== -->
+    <header class="hero" id="top">
+        <img class="hero-photo" src="hero-bg.jpg" alt="" aria-hidden="true">
+        <div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+        <div class="hero-veil" aria-hidden="true"></div>
 
-        <!-- Navigation -->
-        <nav class="nav">
-            <div class="nav-logo">
-                <img src="favicon.svg" alt="PKRU Air Quality" width="32" height="32">
-                <span>PKRU Air Quality</span>
-            </div>
-            <div class="nav-links">
-                <div class="lang-switch" role="group" aria-label="ภาษา">
-                    <button type="button" data-lang-btn="th" aria-pressed="true" class="active">TH</button>
-                    <button type="button" data-lang-btn="en" aria-pressed="false">EN</button>
-                </div>
-                <a href="dashboard.html" class="nav-link">แดชบอร์ด</a>
-                <a href="https://discord.gg/PtUYzzQNf" target="_blank" class="nav-link nav-discord">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-                    Discord
-                </a>
-            </div>
-        </nav>
-
-        <!-- Hero Content -->
-        <div class="hero-content">
-            <div class="hero-copy">
-                <div class="hero-badge"><span class="badge-dot"></span>ระบบเฝ้าระวังคุณภาพอากาศ</div>
-                <p class="hero-kicker">PHUKET RAJABHAT UNIVERSITY · LIVE CAMPUS DATA</p>
-                <h1 class="hero-title">รู้คุณภาพอากาศ<br><span class="gradient-text">ก่อนออกจากอาคาร</span></h1>
-                <p class="hero-desc">ตรวจสอบ PM2.5 อุณหภูมิ และความชื้นจาก 3 จุดสำคัญในมหาวิทยาลัย เพื่อวางแผนกิจกรรมได้อย่างมั่นใจ</p>
-                <div class="hero-actions">
-                    <a href="dashboard.html" class="btn btn-primary">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                        ดู Dashboard
+        <div class="wrap">
+            <!-- Tubelight Navbar -->
+            <div class="topnav">
+                <a href="#top" class="brand"><img src="favicon.svg" alt="" width="30" height="30"><span>PKRU Air Quality</span></a>
+                <nav class="navpill" id="navpill" aria-label="เมนูหลัก">
+                    <a href="#top" class="active">หน้าแรก</a>
+                    <a href="#forecast">พยากรณ์</a>
+                    <a href="#stations">จุดตรวจวัด</a>
+                    <a href="#about">เกี่ยวกับ</a>
+                    <a href="#team">ทีม</a>
+                </nav>
+                <div class="nav-actions">
+                    <div class="lang-switch" role="group" aria-label="ภาษา">
+                        <button type="button" data-lang-btn="th" aria-pressed="true" class="active">TH</button>
+                        <button type="button" data-lang-btn="en" aria-pressed="false">EN</button>
+                    </div>
+                    <button type="button" class="icon-btn" id="themeToggle" aria-label="เปลี่ยนเป็นแผนที่สว่าง">
+                        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+                    </button>
+                    <a href="dashboard.html" class="btn btn-primary btn-sm shiny nav-cta">แดชบอร์ด
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                     </a>
-                    <a href="#about" class="hero-text-link">เกี่ยวกับระบบ <span>↓</span></a>
-                </div>
-                <div class="hero-trust"><span>3 จุดตรวจวัด</span><span>ข้อมูลอัปเดตต่อเนื่อง</span></div>
-            </div>
-
-            <aside class="hero-live-card" id="pm25Quick" aria-label="สรุปคุณภาพอากาศล่าสุด">
-                <div class="live-card-header"><span><i></i>สถานะล่าสุด</span><span>PM2.5 เฉลี่ย</span></div>
-                <div class="pm25-ring" id="pm25Ring">
-                    <svg class="ring-svg" viewBox="0 0 200 200"><circle class="ring-bg" cx="100" cy="100" r="88" /><circle class="ring-progress" id="ringProgress" cx="100" cy="100" r="88" /></svg>
-                    <div class="pm25-center"><span class="pm25-value" id="pm25Value">--</span><span class="pm25-unit">μg/m³</span><span class="pm25-label">ค่าเฉลี่ย PM2.5</span></div>
-                </div>
-                <div class="pm25-status" id="pm25Status"><span class="status-icon" id="statusIcon"></span><span class="status-text" id="statusText">กำลังเชื่อมต่อเซนเซอร์...</span></div>
-                <div class="live-card-footer">
-                    <a href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer">มาตรฐาน PM2.5 <span>↗</span></a>
-                    <a href="dashboard.html">ดูรายละเอียดทั้งหมด →</a>
-                </div>
-            </aside>
-        </div>
-
-
-
-    </section>
-
-    <!-- Info Section -->
-    <section class="info-section">
-        <div class="info-container">
-            <h2 class="info-title">จุดตรวจวัดทั่ว Campus</h2>
-            <p class="info-desc">ติดตั้งเซ็นเซอร์ตรวจวัดคุณภาพอากาศ 3 จุดทั่วมหาวิทยาลัย เพื่อให้ข้อมูลแบบเรียลไทม์</p>
-
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon fi-pm25">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><circle cx="6" cy="8" r="2"/><circle cx="18" cy="9" r="2.5"/><circle cx="8" cy="17" r="1.5"/><circle cx="17" cy="17" r="2"/></svg>
-                    </div>
-                    <h3>PM2.5</h3>
-                    <p>วัดค่าฝุ่นละอองขนาดเล็กแบบเรียลไทม์ พร้อมแจ้งเตือนเมื่อเกินเกณฑ์</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon fi-temp">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="10" y="3" width="4" height="13" rx="2"/><circle cx="12" cy="18" r="3.5"/></svg>
-                    </div>
-                    <h3>อุณหภูมิ</h3>
-                    <p>ตรวจวัดอุณหภูมิอากาศรอบบริเวณตึกแต่ละคณะ</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon fi-hum">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C12 2 4 12 4 17a8 8 0 0016 0c0-5-8-15-8-15z"/></svg>
-                    </div>
-                    <h3>ความชื้น</h3>
-                    <p>วัดความชื้นสัมพัทธ์ในอากาศ เพื่อประเมินสภาพอากาศโดยรวม</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon fi-alert">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-                    </div>
-                    <h3>แจ้งเตือน Discord</h3>
-                    <p>รับการแจ้งเตือนอัตโนมัติผ่าน Discord เมื่อคุณภาพอากาศอยู่ในระดับอันตราย</p>
                 </div>
             </div>
 
-            <!-- AQI Scale -->
-            <div class="aqi-scale">
-                <h3>มาตรฐานสีคุณภาพอากาศ (PM2.5)</h3>
-                <div class="aqi-bar">
-                    <div class="aqi-segment" style="background:#22d3ee"><span>ดีมาก</span><small>0–15.0</small></div>
-                    <div class="aqi-segment" style="background:#10b981"><span>ดี</span><small>15.1–25.0</small></div>
-                    <div class="aqi-segment" style="background:#eab308"><span>ปานกลาง</span><small>25.1–37.5</small></div>
-                    <div class="aqi-segment" style="background:#f97316"><span>เริ่มมีผลกระทบ</span><small>37.6–75.0</small></div>
-                    <div class="aqi-segment" style="background:#f43f5e"><span>มีผลต่อสุขภาพ</span><small>>75.0</small></div>
-                </div>
-            </div>
-
-            <!-- Final CTA -->
-            <div class="final-cta">
-                <a href="dashboard.html" class="btn btn-primary btn-lg">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    เปิดแผนที่ดูข้อมูลเชิงลึก
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ===== About Project ===== -->
-    <section class="about-section" id="about">
-        <div class="about-container">
-            <div class="section-badge">เกี่ยวกับโครงการ</div>
-            <h2 class="section-heading">ระบบเฝ้าระวังคุณภาพอากาศ<br><span class="gradient-text">Smart Campus PKRU</span></h2>
-            <p class="section-subtext">โครงงานพัฒนาระบบตรวจวัดและแจ้งเตือนคุณภาพอากาศแบบเรียลไทม์ภายในมหาวิทยาลัยราชภัฏภูเก็ต เพื่อเฝ้าระวังและดูแลสุขภาพของนักศึกษา บุคลากร และประชาชนทั่วไป</p>
-
-            <div class="about-grid">
-                <div class="about-card reveal-item">
-                    <div class="about-icon abi-goal">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            <div class="hero-grid">
+                <div class="hero-copy">
+                    <div class="live-badge"><span class="pulse-dot" aria-hidden="true"></span><span class="shimmer">LIVE · 3 จุดตรวจวัด</span></div>
+                    <h1 class="hero-title">รู้คุณภาพอากาศ<br><span class="accent">ก่อนออกจากอาคาร</span></h1>
+                    <p class="hero-desc">ตรวจสอบ PM2.5 อุณหภูมิ และความชื้นจาก 3 จุดสำคัญในมหาวิทยาลัย เพื่อวางแผนกิจกรรมได้อย่างมั่นใจ</p>
+                    <div class="hero-actions">
+                        <a href="dashboard.html" class="btn btn-primary shiny">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            ดูแผนที่สด
+                        </a>
+                        <a href="#forecast" class="btn btn-ghost">พยากรณ์ล่วงหน้า</a>
                     </div>
-                    <h3>วัตถุประสงค์</h3>
-                    <ul>
-                        <li>เฝ้าระวังคุณภาพอากาศภายในมหาวิทยาลัยแบบเรียลไทม์</li>
-                        <li>แจ้งเตือนอัตโนมัติเมื่อค่าฝุ่นเกินเกณฑ์มาตรฐาน</li>
-                        <li>เก็บข้อมูลระยะยาวเพื่อการวิเคราะห์และวิจัย</li>
-                        <li>ส่งเสริมแนวคิด Smart Campus ของมหาวิทยาลัย</li>
-                        <li>ให้ข้อมูลคุณภาพอากาศที่เข้าถึงง่ายผ่านเว็บไซต์ ทั้งบนคอมพิวเตอร์และโทรศัพท์</li>
-                        <li>ช่วยให้นักศึกษาและบุคลากรวางแผนกิจกรรมกลางแจ้งได้อย่างปลอดภัย</li>
-                        <li>เปรียบเทียบค่าที่วัดได้กับแหล่งข้อมูลอ้างอิง เช่น กรมควบคุมมลพิษ และ GISTDA</li>
-                        <li>เป็นต้นแบบการใช้ IoT ต้นทุนต่ำ เพื่อการเรียนการสอนและต่อยอดสู่พื้นที่อื่น</li>
+                    <ul class="hero-checks">
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>อัปเดตทุก 30 วินาที</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>เกณฑ์กรมควบคุมมลพิษ 2566</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>แจ้งเตือนผ่าน Discord</li>
                     </ul>
                 </div>
-                <div class="about-card reveal-item">
-                    <div class="about-icon abi-tech">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+
+                <!-- Live card (Glowing Effect) -->
+                <aside class="live-card glow" id="pm25Quick" aria-label="สรุปคุณภาพอากาศล่าสุด">
+                    <div class="live-head">
+                        <span><i></i>สถานะล่าสุด</span>
+                        <span class="mono" id="liveTime"></span>
                     </div>
-                    <h3>เทคโนโลยีที่ใช้</h3>
-                    <ul>
-                        <li><strong>เซ็นเซอร์:</strong> PMS7003 (PM2.5) + DHT22 (อุณหภูมิ/ความชื้น)</li>
-                        <li><strong>ไมโครคอนโทรลเลอร์:</strong> ESP32 พร้อม WiFi</li>
-                        <li><strong>โปรโตคอล:</strong> MQTT สำหรับส่งข้อมูลแบบเรียลไทม์</li>
-                        <li><strong>มาตรฐาน:</strong> อ้างอิงเกณฑ์ PM2.5 กรมควบคุมมลพิษ 2566</li>
+                    <div class="gauge">
+                        <svg viewBox="0 0 220 130" aria-hidden="true">
+                            <path class="seg" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="#22d3ee" stroke-dasharray="14 100"/>
+                            <path class="seg" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="#10b981" stroke-dasharray="9 100" stroke-dashoffset="-15"/>
+                            <path class="seg dim" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="#eab308" stroke-dasharray="11.5 100" stroke-dashoffset="-25"/>
+                            <path class="seg dim" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="#f97316" stroke-dasharray="36.5 100" stroke-dashoffset="-37.5"/>
+                            <path class="seg dim" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="#f43f5e" stroke-dasharray="24 100" stroke-dashoffset="-75"/>
+                            <circle id="gaugeMarker" cx="0" cy="0" r="9" style="transform: translate(20px, 115px)"/>
+                        </svg>
+                        <div class="gauge-center">
+                            <span class="pm25-value" id="pm25Value">--</span>
+                            <span class="pm25-unit">μg/m³ · ค่าเฉลี่ย PM2.5</span>
+                        </div>
+                    </div>
+                    <div class="status-box" id="pm25Status">
+                        <span class="status-icon" id="statusIcon"></span>
+                        <div class="status-copy">
+                            <strong class="status-level" id="statusLevel"></strong>
+                            <span class="status-text" id="statusText">กำลังเชื่อมต่อเซนเซอร์...</span>
+                        </div>
+                    </div>
+                    <ul class="station-list" aria-label="ค่า PM2.5 รายจุด">
+                        <li data-node="node2"><i></i><span>คณะวิทยาศาสตร์และเทคโนโลยี</span><b>--</b></li>
+                        <li data-node="node3"><i></i><span>คณะมนุษยศาสตร์และสังคมศาสตร์</span><b>--</b></li>
+                        <li data-node="node4"><i></i><span>คณะวิทยาการจัดการ</span><b>--</b></li>
                     </ul>
-                </div>
-                <div class="about-card reveal-item">
-                    <div class="about-icon abi-scope">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <div class="live-foot">
+                        <a href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer">มาตรฐาน PM2.5 <span aria-hidden="true">↗</span></a>
+                        <a href="dashboard.html">ดูรายละเอียดทั้งหมด →</a>
                     </div>
-                    <h3>ขอบเขตการติดตั้ง</h3>
-                    <ul>
-                        <li>ติดตั้งเซ็นเซอร์ 3 จุดภายในมหาวิทยาลัย</li>
-                        <li>คณะวิทยาศาสตร์ · คณะมนุษยศาสตร์</li>
-                        <li>คณะวิทยาการจัดการ</li>
-                        <li>ส่งข้อมูลอัตโนมัติทุก 30 วินาที ตลอด 24 ชั่วโมง</li>
-                    </ul>
-                </div>
+                </aside>
             </div>
         </div>
-    </section>
+    </header>
 
-    <!-- ===== Historical Chart ===== -->
-    <section class="chart-section">
-        <div class="chart-container">
-            <div class="section-badge">ข้อมูลย้อนหลัง</div>
-            <h2 class="section-heading">สถิติค่า PM2.5 รายสัปดาห์</h2>
-            <p class="section-subtext">ระบบเก็บข้อมูลต่อเนื่อง เพื่อวิเคราะห์แนวโน้มและนำไปใช้ในงานวิจัย</p>
+    <!-- ===== Logo Marquee ===== -->
+    <div class="marquee" aria-label="เทคโนโลยีและแหล่งข้อมูลที่ใช้">
+        <div class="marquee-track" aria-hidden="true">
+            <span>PMS7003</span><span>✦</span><span>DHT22</span><span>✦</span><span>ESP32</span><span>✦</span><span>MQTT</span><span>✦</span><span>AIR4THAI</span><span>✦</span><span>GISTDA</span><span>✦</span><span>OPEN-METEO</span><span>✦</span><span>AEROLINK</span><span>✦</span><span>DISCORD</span><span>✦</span>
+            <span>PMS7003</span><span>✦</span><span>DHT22</span><span>✦</span><span>ESP32</span><span>✦</span><span>MQTT</span><span>✦</span><span>AIR4THAI</span><span>✦</span><span>GISTDA</span><span>✦</span><span>OPEN-METEO</span><span>✦</span><span>AEROLINK</span><span>✦</span><span>DISCORD</span><span>✦</span>
+        </div>
+        <p class="sr-only">PMS7003, DHT22, ESP32, MQTT, Air4Thai, GISTDA, Open-Meteo, Aerolink, Discord</p>
+    </div>
 
-            <div class="chart-wrapper reveal-item">
-                <div class="chart-header">
-                    <div class="chart-title-group">
-                        <span class="chart-label">ค่าเฉลี่ย PM2.5 รายวัน</span>
-                        <span class="chart-period">ย้อนหลัง 7 วัน (ข้อมูลตัวอย่าง)</span>
+    <main>
+        <!-- ===== พยากรณ์อากาศและฝุ่น PM2.5 (weather-forecast.js สร้างเนื้อหาในกล่องนี้) ===== -->
+        <section class="forecast-section" id="forecast" aria-labelledby="forecastTitle">
+            <div class="forecast-container" id="pkruForecast"></div>
+        </section>
+
+        <!-- ===== Bento Grid: จุดตรวจวัด ===== -->
+        <section class="section" id="stations">
+            <div class="wrap">
+                <div class="section-head reveal">
+                    <span class="eyebrow">Campus sensors</span>
+                    <h2 class="section-title">จุดตรวจวัดทั่ว Campus</h2>
+                    <p class="section-sub">ติดตั้งเซ็นเซอร์ตรวจวัดคุณภาพอากาศ 3 จุดทั่วมหาวิทยาลัย เพื่อให้ข้อมูลแบบเรียลไทม์</p>
+                </div>
+                <div class="bento">
+                    <div class="card map-tile span2 row2 reveal">
+                        <svg class="map-art" viewBox="0 0 560 440" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                            <defs><pattern id="mapGrid" width="28" height="28" patternUnits="userSpaceOnUse"><path class="grid-line" d="M28 0H0V28" fill="none"/></pattern></defs>
+                            <rect width="560" height="440" fill="url(#mapGrid)"/>
+                            <path class="road" d="M-10 300 C120 260 200 320 300 280 S470 200 580 230" fill="none" stroke-width="14" stroke-linecap="round"/>
+                            <path class="road" d="M180 -10 C200 120 170 260 240 460" fill="none" stroke-width="10"/>
+                            <rect class="block" x="120" y="90" width="70" height="44" rx="6"/>
+                            <rect class="block" x="300" y="120" width="96" height="56" rx="6"/>
+                            <rect class="block" x="360" y="300" width="80" height="50" rx="6"/>
+                            <rect class="block" x="70" y="330" width="90" height="46" rx="6"/>
+                        </svg>
+                        <div class="mini-map" id="miniMap" role="region" aria-label="แผนที่จุดตรวจวัดใน มรภ.ภูเก็ต"></div>
+                        <div class="mini-map-veil" aria-hidden="true"></div>
+                        <div class="map-tile-foot">
+                            <div><strong>แผนที่ Campus</strong><span>3 จุดตรวจวัด · ค่า PM2.5 ล่าสุด</span></div>
+                            <a href="dashboard.html">เปิดแผนที่ →</a>
+                        </div>
                     </div>
-                    <div class="chart-legend-inline">
-                        <span class="cli-item"><span class="cli-dot" style="background:#818cf8"></span>PM2.5</span>
-                        <span class="cli-item"><span class="cli-line" style="background:#f43f5e"></span>เกณฑ์เฝ้าระวัง (37.5)</span>
+
+                    <div class="card tile span2 reveal">
+                        <div class="tile-row">
+                            <span class="tile-icon ti-pm"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="6" cy="8" r="2"/><circle cx="18" cy="9" r="2.5"/><circle cx="8" cy="17" r="1.5"/><circle cx="17" cy="17" r="2"/></svg></span>
+                            <span class="tile-value" id="tilePm">--<small>μg/m³</small></span>
+                        </div>
+                        <h3>PM2.5</h3>
+                        <p>วัดค่าฝุ่นละอองขนาดเล็กแบบเรียลไทม์ พร้อมแจ้งเตือนเมื่อเกินเกณฑ์</p>
+                    </div>
+                    <div class="card tile reveal">
+                        <span class="tile-icon ti-temp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="10" y="3" width="4" height="13" rx="2"/><circle cx="12" cy="18" r="3.5"/></svg></span>
+                        <span class="tile-value" id="tileTemp">--<small>°C</small></span>
+                        <h3>อุณหภูมิ</h3>
+                        <p>ตรวจวัดอุณหภูมิอากาศรอบบริเวณตึกแต่ละคณะ</p>
+                    </div>
+                    <div class="card tile reveal">
+                        <span class="tile-icon ti-hum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2C12 2 4 12 4 17a8 8 0 0016 0c0-5-8-15-8-15z"/></svg></span>
+                        <span class="tile-value" id="tileHum">--<small>%RH</small></span>
+                        <h3>ความชื้น</h3>
+                        <p>วัดความชื้นสัมพัทธ์ในอากาศ เพื่อประเมินสภาพอากาศโดยรวม</p>
+                    </div>
+
+                    <div class="card tile discord-tile span4 glow reveal">
+                        <div class="tile-row">
+                            <span class="tile-icon ti-discord"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></span>
+                            <div>
+                                <h3>แจ้งเตือน Discord</h3>
+                                <p>รับการแจ้งเตือนอัตโนมัติผ่าน Discord เมื่อคุณภาพอากาศอยู่ในระดับอันตราย</p>
+                            </div>
+                        </div>
+                        <a href="https://discord.gg/PtUYzzQNf" target="_blank" rel="noopener noreferrer" class="btn btn-discord">เข้าร่วม Discord</a>
                     </div>
                 </div>
-                <div class="chart-body">
-                    <svg class="mock-chart" viewBox="0 0 700 240" preserveAspectRatio="none">
-                        <!-- Grid lines -->
-                        <line x1="0" y1="48" x2="700" y2="48" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
-                        <line x1="0" y1="96" x2="700" y2="96" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
-                        <line x1="0" y1="144" x2="700" y2="144" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
-                        <line x1="0" y1="192" x2="700" y2="192" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
-                        <!-- Threshold line -->
-                        <line x1="0" y1="120" x2="700" y2="120" stroke="#f43f5e" stroke-width="1" stroke-dasharray="6,4" opacity="0.5"/>
-                        <!-- Area fill -->
-                        <path d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125 L700,240 L0,240 Z" fill="url(#chartGrad)" opacity="0.3"/>
-                        <!-- Line -->
-                        <path d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125" fill="none" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round"/>
-                        <!-- Data dots -->
-                        <circle cx="0" cy="180" r="4" fill="#818cf8"/>
-                        <circle cx="117" cy="148" r="4" fill="#818cf8"/>
-                        <circle cx="233" cy="108" r="4" fill="#818cf8"/>
-                        <circle cx="350" cy="122" r="4" fill="#818cf8"/>
-                        <circle cx="467" cy="98" r="4" fill="#f43f5e"/>
-                        <circle cx="583" cy="138" r="4" fill="#818cf8"/>
-                        <circle cx="700" cy="125" r="4" fill="#818cf8"/>
-                        <defs>
-                            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stop-color="#818cf8" stop-opacity="0.4"/>
-                                <stop offset="100%" stop-color="#818cf8" stop-opacity="0"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                    <div class="chart-x-labels">
-                        <span>จ.</span><span>อ.</span><span>พ.</span><span>พฤ.</span><span>ศ.</span><span>ส.</span><span>อา.</span>
+
+                <!-- AQI scale -->
+                <div class="card aqi-card reveal">
+                    <div class="aqi-card-head">
+                        <h3>มาตรฐานสีคุณภาพอากาศ (PM2.5)</h3>
+                        <span>μg/m³ · กรมควบคุมมลพิษ 2566</span>
                     </div>
-                </div>
-                <div class="chart-stats">
-                    <div class="cs-item">
-                        <span class="cs-value" style="color:#10b981">18.2</span>
-                        <span class="cs-label">ค่าต่ำสุด</span>
+                    <div class="aqi-track">
+                        <div class="aqi-bar" aria-hidden="true"><span style="background:#22d3ee"></span><span style="background:#10b981"></span><span style="background:#eab308"></span><span style="background:#f97316"></span><span style="background:#f43f5e"></span></div>
+                        <span class="aqi-marker" id="aqiMarker" aria-hidden="true"></span>
                     </div>
-                    <div class="cs-item">
-                        <span class="cs-value" style="color:#818cf8">27.4</span>
-                        <span class="cs-label">ค่าเฉลี่ย</span>
-                    </div>
-                    <div class="cs-item">
-                        <span class="cs-value" style="color:#f43f5e">41.6</span>
-                        <span class="cs-label">ค่าสูงสุด</span>
-                    </div>
-                    <div class="cs-item">
-                        <span class="cs-value" style="color:#eab308">1 วัน</span>
-                        <span class="cs-label">เกินเกณฑ์</span>
+                    <div class="aqi-labels">
+                        <div><strong style="color: var(--ink-vgood)">ดีมาก</strong><small>0–15.0</small></div>
+                        <div><strong style="color: var(--ink-good)">ดี</strong><small>15.1–25.0</small></div>
+                        <div><strong style="color: var(--ink-mod)">ปานกลาง</strong><small>25.1–37.5</small></div>
+                        <div><strong style="color: var(--ink-usg)">เริ่มมีผลกระทบ</strong><small>37.6–75.0</small></div>
+                        <div><strong style="color: var(--ink-bad)">มีผลต่อสุขภาพ</strong><small>&gt;75.0</small></div>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- ===== Team Section ===== -->
-    <section class="team-section">
-        <div class="team-container">
-            <div class="section-badge">ทีมผู้จัดทำ</div>
-            <h2 class="section-heading">ผู้พัฒนาโครงการ</h2>
-            <p class="section-subtext">สาขาวิชาวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์และเทคโนโลยี<br>มหาวิทยาลัยราชภัฏภูเก็ต</p>
-
-            <div class="team-grid">
-                <div class="team-card reveal-item">
-                    <div class="team-avatar ta-advisor">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    </div>
-                    <div class="team-role">อาจารย์ที่ปรึกษา</div>
-                    <div class="team-name">ผศ.ดร.ทรงเกียรติ ภาวดี</div>
-                    <div class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</div>
+        <!-- ===== Animated Beam: การทำงานของระบบ ===== -->
+        <section class="section" id="how">
+            <div class="wrap">
+                <div class="section-head center reveal">
+                    <span class="eyebrow">How it works</span>
+                    <h2 class="section-title">จากเซนเซอร์ถึงหน้าจอคุณ</h2>
                 </div>
-                <div class="team-card reveal-item">
-                    <div class="team-avatar ta-dev">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <div class="beam-flow reveal">
+                    <div class="beam-node">
+                        <span class="beam-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3"/></svg></span>
+                        <strong>เซนเซอร์ 3 จุด</strong><span>PMS7003 + DHT22</span>
                     </div>
-                    <div class="team-role">ผู้พัฒนา</div>
-                    <div class="team-name">นายศิรวิทย์ จันสุกศรี</div>
-                    <div class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</div>
-                </div>
-                <div class="team-card reveal-item">
-                    <div class="team-avatar ta-dev">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span class="beam-line" aria-hidden="true"></span>
+                    <div class="beam-node">
+                        <span class="beam-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M2 9a14 14 0 0120 0"/><circle cx="12" cy="19.5" r="1"/></svg></span>
+                        <strong>ESP32</strong><span>ส่งข้อมูลผ่าน WiFi</span>
                     </div>
-                    <div class="team-role">ผู้พัฒนา</div>
-                    <div class="team-name">นายปรมินทร์ ข้องรัก</div>
-                    <div class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</div>
+                    <span class="beam-line" aria-hidden="true"></span>
+                    <div class="beam-node">
+                        <span class="beam-icon hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><circle cx="4" cy="6" r="1.8"/><circle cx="20" cy="6" r="1.8"/><circle cx="4" cy="18" r="1.8"/><circle cx="20" cy="18" r="1.8"/><path d="M5.6 7l4.3 3.6M18.4 7l-4.3 3.6M5.6 17l4.3-3.6M18.4 17l-4.3-3.6"/></svg></span>
+                        <strong>MQTT</strong><span>ทุก 30 วินาที</span>
+                    </div>
+                    <span class="beam-line" aria-hidden="true"></span>
+                    <div class="beam-outs">
+                        <a class="beam-out" href="dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>เว็บไซต์และแดชบอร์ด</a>
+                        <a class="beam-out discord" href="https://discord.gg/PtUYzzQNf" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg>แจ้งเตือน Discord</a>
+                    </div>
                 </div>
             </div>
+        </section>
 
-            <a href="https://discord.gg/PtUYzzQNf" target="_blank" class="contact-box reveal-item" style="text-decoration:none">
-                <div class="contact-icon" style="background:rgba(88,101,242,0.12); color:#7c8af8">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+        <!-- ===== Historical Chart ===== -->
+        <section class="section" id="history">
+            <div class="wrap">
+                <div class="card chart-card reveal">
+                    <div class="chart-top">
+                        <div>
+                            <span class="eyebrow">ข้อมูลย้อนหลัง</span>
+                            <h2>สถิติค่า PM2.5 รายสัปดาห์</h2>
+                            <p>ย้อนหลัง 7 วัน (ข้อมูลตัวอย่าง)</p>
+                        </div>
+                        <div class="chart-legend"><span><i></i>PM2.5</span><span><i class="watch"></i>เกณฑ์เฝ้าระวัง (37.5)</span></div>
+                    </div>
+                    <div class="chart-body">
+                        <svg viewBox="0 0 700 240" preserveAspectRatio="none" role="img" aria-label="กราฟค่าเฉลี่ย PM2.5 รายวัน ย้อนหลัง 7 วัน">
+                            <defs><linearGradient id="chartArea" x1="0" y1="0" x2="0" y2="1"><stop class="area-top" offset="0%"/><stop class="area-bot" offset="100%"/></linearGradient></defs>
+                            <line class="grid" x1="0" y1="60" x2="700" y2="60"/>
+                            <line class="threshold" x1="0" y1="120" x2="700" y2="120"/>
+                            <line class="grid" x1="0" y1="180" x2="700" y2="180"/>
+                            <path d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125 L700,240 L0,240 Z" fill="url(#chartArea)"/>
+                            <path class="line" d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125"/>
+                        </svg>
+                    </div>
+                    <div class="chart-x" aria-hidden="true"><span>จ.</span><span>อ.</span><span>พ.</span><span>พฤ.</span><span>ศ.</span><span>ส.</span><span>อา.</span></div>
+                    <div class="stat-row">
+                        <div class="stat"><b style="color: var(--ink-good)">18.2</b><span>ค่าต่ำสุด</span></div>
+                        <div class="stat"><b>27.4</b><span>ค่าเฉลี่ย</span></div>
+                        <div class="stat"><b style="color: var(--ink-bad)">41.6</b><span>ค่าสูงสุด</span></div>
+                        <div class="stat"><b style="color: var(--ink-mod)">1 วัน</b><span>เกินเกณฑ์</span></div>
+                    </div>
                 </div>
-                <div class="contact-info">
-                    <span class="contact-label">ติดต่อสอบถาม</span>
-                    <span class="contact-value" style="color:#7c8af8">Discord Server</span>
-                    <span class="contact-sub">คลิกเพื่อเข้าร่วม Discord สอบถามข้อมูลเพิ่มเติม</span>
-                </div>
-            </a>
-        </div>
-    </section>
+            </div>
+        </section>
 
-    <!-- ===== Footer ===== -->
+        <!-- ===== About (Animated Tabs) ===== -->
+        <section class="section" id="about">
+            <div class="wrap about-grid">
+                <div class="about-intro reveal">
+                    <span class="eyebrow">เกี่ยวกับโครงการ</span>
+                    <h2 class="section-title">ระบบเฝ้าระวังคุณภาพอากาศ<br>Smart Campus PKRU</h2>
+                    <p class="section-sub">โครงงานพัฒนาระบบตรวจวัดและแจ้งเตือนคุณภาพอากาศแบบเรียลไทม์ภายในมหาวิทยาลัยราชภัฏภูเก็ต เพื่อเฝ้าระวังและดูแลสุขภาพของนักศึกษา บุคลากร และประชาชนทั่วไป</p>
+                </div>
+                <div class="about-main reveal">
+                    <div class="tabs no-js" role="tablist" aria-label="เกี่ยวกับโครงการ" id="aboutTabs">
+                        <span class="tab-indicator" aria-hidden="true"></span>
+                        <button type="button" role="tab" id="tab-goal" aria-controls="panel-goal" aria-selected="true">วัตถุประสงค์</button>
+                        <button type="button" role="tab" id="tab-tech" aria-controls="panel-tech" aria-selected="false" tabindex="-1">เทคโนโลยีที่ใช้</button>
+                        <button type="button" role="tab" id="tab-scope" aria-controls="panel-scope" aria-selected="false" tabindex="-1">ขอบเขตการติดตั้ง</button>
+                    </div>
+                    <div class="card tab-panel" role="tabpanel" id="panel-goal" aria-labelledby="tab-goal">
+                        <ul class="goal-list">
+                            <li>เฝ้าระวังคุณภาพอากาศภายในมหาวิทยาลัยแบบเรียลไทม์</li>
+                            <li>แจ้งเตือนอัตโนมัติเมื่อค่าฝุ่นเกินเกณฑ์มาตรฐาน</li>
+                            <li>เก็บข้อมูลระยะยาวเพื่อการวิเคราะห์และวิจัย</li>
+                            <li>ส่งเสริมแนวคิด Smart Campus ของมหาวิทยาลัย</li>
+                            <li>ให้ข้อมูลคุณภาพอากาศที่เข้าถึงง่ายผ่านเว็บไซต์ ทั้งบนคอมพิวเตอร์และโทรศัพท์</li>
+                            <li>ช่วยให้นักศึกษาและบุคลากรวางแผนกิจกรรมกลางแจ้งได้อย่างปลอดภัย</li>
+                            <li>เปรียบเทียบค่าที่วัดได้กับแหล่งข้อมูลอ้างอิง เช่น กรมควบคุมมลพิษ และ GISTDA</li>
+                            <li>เป็นต้นแบบการใช้ IoT ต้นทุนต่ำ เพื่อการเรียนการสอนและต่อยอดสู่พื้นที่อื่น</li>
+                        </ul>
+                    </div>
+                    <div class="card tab-panel" role="tabpanel" id="panel-tech" aria-labelledby="tab-tech" hidden>
+                        <div class="tech-grid">
+                            <div><span>เซ็นเซอร์:</span><strong>PMS7003 (PM2.5) + DHT22 (อุณหภูมิ/ความชื้น)</strong></div>
+                            <div><span>ไมโครคอนโทรลเลอร์:</span><strong>ESP32 พร้อม WiFi</strong></div>
+                            <div><span>โปรโตคอล:</span><strong>MQTT สำหรับส่งข้อมูลแบบเรียลไทม์</strong></div>
+                            <div><span>มาตรฐาน:</span><strong>อ้างอิงเกณฑ์ PM2.5 กรมควบคุมมลพิษ 2566</strong></div>
+                        </div>
+                    </div>
+                    <div class="card tab-panel" role="tabpanel" id="panel-scope" aria-labelledby="tab-scope" hidden>
+                        <ul class="scope-list">
+                            <li>คณะวิทยาศาสตร์และเทคโนโลยี</li>
+                            <li>คณะมนุษยศาสตร์และสังคมศาสตร์</li>
+                            <li>คณะวิทยาการจัดการ</li>
+                        </ul>
+                        <p class="scope-note">ส่งข้อมูลอัตโนมัติทุก 30 วินาที ตลอด 24 ชั่วโมง</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== Team ===== -->
+        <section class="section" id="team">
+            <div class="wrap">
+                <div class="section-head center reveal">
+                    <span class="eyebrow">ทีมผู้จัดทำ</span>
+                    <h2 class="section-title">ผู้พัฒนาโครงการ</h2>
+                    <p class="section-sub">สาขาวิชาวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์และเทคโนโลยี<br>มหาวิทยาลัยราชภัฏภูเก็ต</p>
+                </div>
+                <div class="team-grid">
+                    <div class="card team-card lead reveal">
+                        <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                        <span class="team-role">อาจารย์ที่ปรึกษา</span>
+                        <span class="team-name">ผศ.ดร.ทรงเกียรติ ภาวดี</span>
+                        <span class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</span>
+                    </div>
+                    <div class="card team-card reveal">
+                        <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                        <span class="team-role">ผู้พัฒนา</span>
+                        <span class="team-name">นายศิรวิทย์ จันสุกศรี</span>
+                        <span class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</span>
+                    </div>
+                    <div class="card team-card reveal">
+                        <span class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                        <span class="team-role">ผู้พัฒนา</span>
+                        <span class="team-name">นายปรมินทร์ ข้องรัก</span>
+                        <span class="team-dept">สาขาวิชาวิทยาการคอมพิวเตอร์</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CTA ===== -->
+        <section class="section">
+            <div class="wrap">
+                <div class="card cta-band reveal">
+                    <div>
+                        <h2>เปิดแผนที่ดูข้อมูลเชิงลึก</h2>
+                        <p>ดูค่ารายจุด เปรียบเทียบกับ Air4Thai, GISTDA และ Open-Meteo พร้อมข้อมูลย้อนหลัง</p>
+                    </div>
+                    <a href="dashboard.html" class="btn btn-primary shiny">เปิดแดชบอร์ด →</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===== Footer (Big-text) ===== -->
     <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-main">
+        <div class="wrap">
+            <div class="footer-top">
                 <div class="footer-brand">
-                    <img src="favicon.svg" alt="PKRU Air Quality" width="28" height="28">
-                    <span>PKRU Air Quality Monitor</span>
+                    <strong><img src="favicon.svg" alt="" width="26" height="26">PKRU Air Quality Monitor</strong>
+                    <p><strong>ข้อจำกัดความรับผิดชอบ:</strong> ข้อมูลที่แสดงในระบบนี้ได้มาจากเซ็นเซอร์ที่ติดตั้งภายในมหาวิทยาลัยราชภัฏภูเก็ต มีวัตถุประสงค์เพื่อการเฝ้าระวังเบื้องต้นเท่านั้น ไม่สามารถใช้อ้างอิงทางกฎหมายหรือการแพทย์ได้ เซ็นเซอร์ส่งข้อมูลทุก 30 วินาที ค่าที่แสดงอาจมีความคลาดเคลื่อนจากค่ามาตรฐานของกรมควบคุมมลพิษ</p>
                 </div>
-                <div class="footer-links">
+                <nav class="footer-links" aria-label="ลิงก์ท้ายเว็บ">
                     <a href="dashboard.html">Dashboard</a>
-                    <a href="https://discord.gg/PtUYzzQNf" target="_blank">Discord</a>
-                    <a href="https://www.pkru.ac.th" target="_blank">มรภ.ภูเก็ต</a>
-                </div>
-            </div>
-            <div class="footer-disclaimer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <p><strong>ข้อจำกัดความรับผิดชอบ:</strong> ข้อมูลที่แสดงในระบบนี้ได้มาจากเซ็นเซอร์ที่ติดตั้งภายในมหาวิทยาลัยราชภัฏภูเก็ต มีวัตถุประสงค์เพื่อการเฝ้าระวังเบื้องต้นเท่านั้น ไม่สามารถใช้อ้างอิงทางกฎหมายหรือการแพทย์ได้ เซ็นเซอร์ส่งข้อมูลทุก 30 วินาที ค่าที่แสดงอาจมีความคลาดเคลื่อนจากค่ามาตรฐานของกรมควบคุมมลพิษ</p>
+                    <a href="https://discord.gg/PtUYzzQNf" target="_blank" rel="noopener noreferrer">Discord</a>
+                    <a href="https://www.pkru.ac.th" target="_blank" rel="noopener noreferrer">มรภ.ภูเก็ต</a>
+                </nav>
             </div>
             <div class="footer-bottom">
                 <p>© 2026 PKRU Air Quality Monitor — มหาวิทยาลัยราชภัฏภูเก็ต | พัฒนาเป็นส่วนหนึ่งของโครงงานสาขาวิชาวิทยาการคอมพิวเตอร์</p>
             </div>
+            <div class="big-word" aria-hidden="true">PKRU AIR</div>
         </div>
     </footer>
 
-    <script src="i18n.js?v=20261001b"></script>
+    <!-- ===== Mobile tab bar ===== -->
+    <nav class="tabbar" id="tabbar" aria-label="เมนูหลัก (มือถือ)">
+        <a href="#top" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>หน้าแรก</a>
+        <a href="dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>แผนที่</a>
+        <a href="#forecast"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 000-8 6 6 0 00-11.6 1.6A3.3 3.3 0 007 18z"/></svg>พยากรณ์</a>
+        <a href="#about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>เกี่ยวกับ</a>
+    </nav>
+
+    <script src="i18n.js?v=20261005r3"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <script src="config.js?v=20261002a"></script>
     <script src="api.js?v=20260930c"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="site.js?v=20261005r2"></script>
     <script>
         // ===== PM2.5 Quick View =====
         function getAQILevel(pm25) {
-            if (pm25 <= 15.0) return { color: '#22d3ee', level: 'very-good', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
-            if (pm25 <= 25.0) return { color: '#10b981', level: 'good', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
-            if (pm25 <= 37.5) return { color: '#eab308', level: 'moderate', advice: 'ผู้มีโรคประจำตัวควรระวัง' };
-            if (pm25 <= 75.0) return { color: '#f97316', level: 'unhealthy-sg', advice: 'ควรสวมหน้ากากอนามัย' };
-            return { color: '#f43f5e', level: 'unhealthy', advice: 'งดกิจกรรมกลางแจ้ง ปิดหน้าต่าง' };
+            if (pm25 <= 15.0) return { color: '#22d3ee', level: 'very-good', label: 'ดีมาก', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
+            if (pm25 <= 25.0) return { color: '#10b981', level: 'good', label: 'ดี', advice: 'ทำกิจกรรมกลางแจ้งได้ตามปกติ' };
+            if (pm25 <= 37.5) return { color: '#eab308', level: 'moderate', label: 'ปานกลาง', advice: 'ผู้มีโรคประจำตัวควรระวัง' };
+            if (pm25 <= 75.0) return { color: '#f97316', level: 'unhealthy-sg', label: 'เริ่มมีผลกระทบ', advice: 'ควรสวมหน้ากากอนามัย' };
+            return { color: '#f43f5e', level: 'unhealthy', label: 'มีผลต่อสุขภาพ', advice: 'งดกิจกรรมกลางแจ้ง ปิดหน้าต่าง' };
         }
 
         function getAirStatusIcon(level) {
@@ -353,25 +418,54 @@
                 'unhealthy-sg': '<circle cx="16" cy="16" r="10"/><path d="M12 13h.1M20 13h.1M7 17l4-1.2 5 1.2 5-1.2 4 1.2M10.5 17v6c3.4 2.2 7.6 2.2 11 0v-6M13 20h6M13 22h6"/>',
                 unhealthy: '<circle cx="16" cy="16" r="10"/><path d="M12 13h.1M20 13h.1M7 17l4-1.2 5 1.2 5-1.2 4 1.2M10.5 17v6c3.4 2.2 7.6 2.2 11 0v-6M13 20h6M13 22h6M16 18.5V24"/>',
             };
-            return `<span class="air-status-face air-status-${level}"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${faces[level]}</svg></span>`;
+            return `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${faces[level]}</svg>`;
+        }
+
+        // ตำแหน่งบนเกจครึ่งวงกลม: สเกล 0–100 μg/m³ (ช่วงสีตามเกณฑ์ กรมควบคุมมลพิษ)
+        function gaugePoint(pm25) {
+            const p = Math.max(0, Math.min(pm25 / 100, 1));
+            const a = Math.PI * (1 - p);
+            return { x: 110 + 90 * Math.cos(a), y: 115 - 90 * Math.sin(a), p };
+        }
+
+        function formatTime(d) {
+            return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
         }
 
         function updatePM25Display(pm25) {
             const aqi = getAQILevel(pm25);
-            const circumference = 2 * Math.PI * 88;
-            const progress = Math.min(pm25 / 150, 1);
-
+            const pt = gaugePoint(pm25);
             document.getElementById('pm25Value').textContent = pm25.toFixed(1);
             document.getElementById('statusIcon').innerHTML = getAirStatusIcon(aqi.level);
+            document.getElementById('statusLevel').textContent = aqi.label;
             document.getElementById('statusText').textContent = aqi.advice;
+            document.getElementById('gaugeMarker').style.transform = `translate(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px)`;
+            document.getElementById('pm25Quick').style.setProperty('--aqi-color', aqi.color);
+            document.getElementById('liveTime').textContent = formatTime(new Date());
+            const tile = document.getElementById('tilePm');
+            tile.firstChild.nodeValue = pm25.toFixed(1);
+            const marker = document.getElementById('aqiMarker');
+            marker.style.left = (pt.p * 100).toFixed(1) + '%';
+            marker.classList.add('on');
+        }
 
-            const ring = document.getElementById('ringProgress');
-            ring.style.strokeDasharray = circumference;
-            ring.style.strokeDashoffset = circumference * (1 - progress);
-            ring.style.stroke = aqi.color;
-
-            const quick = document.getElementById('pm25Quick');
-            quick.style.setProperty('--aqi-color', aqi.color);
+        // ค่ารายจุด (การ์ดสด + หมุดบนแผนที่ย่อ + ไทล์อุณหภูมิ/ความชื้น)
+        function updateStations(rows) {
+            rows.forEach(r => {
+                if (!Number.isFinite(r.pm25)) return;
+                const color = getAQILevel(r.pm25).color;
+                const li = document.querySelector(`.station-list li[data-node="${r.nodeId}"]`);
+                if (li) { li.style.setProperty('--dot', color); li.querySelector('b').textContent = r.pm25.toFixed(1); }
+                const pin = document.querySelector(`[data-pin="${r.nodeId}"]`);
+                if (pin) { pin.style.setProperty('--dot', color); pin.querySelector('b').textContent = r.pm25.toFixed(1); }
+            });
+            const avg = key => {
+                const v = rows.map(r => r[key]).filter(Number.isFinite);
+                return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+            };
+            const t = avg('temperature'), h = avg('humidity');
+            if (t !== null) document.getElementById('tileTemp').firstChild.nodeValue = t.toFixed(1);
+            if (h !== null) document.getElementById('tileHum').firstChild.nodeValue = h.toFixed(0);
         }
 
         // ===== ค่า PM2.5 เฉลี่ยจากเซนเซอร์จริง (MQTT) =====
@@ -379,23 +473,40 @@
 
         // ข้อมูลจำลองระหว่างรอข้อมูลจริง (หยุดเองเมื่อมีข้อมูลจริงเข้ามา)
         const USE_SIMULATION = true;
-        let currentPM25 = 18;
         let simTimer = null;
+        // ค่าจำลองรายจุด (แบบเดียวกับแดชบอร์ด) — หยุดเองเมื่อมีข้อมูลจริง
+        const simNodes = ['node2', 'node3', 'node4'].map(id => ({
+            nodeId: id,
+            pm25: 12 + Math.random() * 20,
+            temperature: 29 + Math.random() * 5,
+            humidity: 65 + Math.random() * 20,
+        }));
+        const drift = (v, d, lo, hi) => Math.max(lo, Math.min(hi, v + (Math.random() - 0.5) * d));
+
         function simulatePM25() {
-            currentPM25 = Math.max(5, Math.min(60, currentPM25 + (Math.random() - 0.5) * 4));
-            updatePM25Display(currentPM25);
+            simNodes.forEach(n => {
+                n.pm25 = drift(n.pm25, 4, 5, 60);
+                n.temperature = drift(n.temperature, 0.6, 24, 38);
+                n.humidity = drift(n.humidity, 2, 50, 95);
+            });
+            updatePM25Display(simNodes.reduce((a, n) => a + n.pm25, 0) / simNodes.length);
+            updateStations(simNodes);
         }
+
         if (USE_SIMULATION) {
             setTimeout(() => { if (!simTimer) { simulatePM25(); simTimer = setInterval(simulatePM25, 5000); } }, 800);
         }
+
         function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
+
         const NODE_IDS = ['node2', 'node3', 'node4'];
         const latest = {};
 
         function refreshAverage() {
-            const values = NODE_IDS.map(id => latest[id]).filter(v => Number.isFinite(v));
+            const values = NODE_IDS.map(id => latest[id] && latest[id].pm25).filter(v => Number.isFinite(v));
             if (!values.length) return;
             updatePM25Display(values.reduce((a, b) => a + b, 0) / values.length);
+            updateStations(NODE_IDS.filter(id => latest[id]).map(id => ({ nodeId: id, ...latest[id] })));
         }
 
         function setWaiting(text) {
@@ -414,9 +525,10 @@
             if (MQTT_CONFIG.username) { options.username = MQTT_CONFIG.username; options.password = MQTT_CONFIG.password; }
             const client = mqtt.connect(url, options);
             const prefix = MQTT_CONFIG.topicPrefix;
+            const FIELD = { pm25: 'pm25', temperature: 'temperature', temp: 'temperature', humidity: 'humidity', hum: 'humidity' };
             client.on('connect', () => {
                 client.subscribe(`${prefix}/+`);
-                client.subscribe(`${prefix}/+/pm25`);
+                client.subscribe(`${prefix}/+/+`);
                 setWaiting('รอข้อมูลจากเซนเซอร์...');
             });
             client.on('message', (topic, message) => {
@@ -424,38 +536,49 @@
                 const nodeId = parts[1];
                 if (!NODE_IDS.includes(nodeId)) return;
                 const text = message.toString().trim();
-                let value = null;
+                const cur = latest[nodeId] || (latest[nodeId] = {});
                 if (parts.length >= 3) {
-                    try { const j = JSON.parse(text); value = typeof j === 'number' ? j : parseFloat(j.value ?? j.pm25); }
+                    const field = FIELD[parts[2]];
+                    if (!field) return;
+                    let value;
+                    try { const j = JSON.parse(text); value = typeof j === 'number' ? j : parseFloat(j.value ?? j[field]); }
                     catch { value = parseFloat(text); }
+                    if (Number.isFinite(value)) cur[field] = value;
                 } else {
-                    try { value = parseFloat(JSON.parse(text).pm25); } catch { /* ไม่ใช่ JSON */ }
+                    try {
+                        const j = JSON.parse(text);
+                        ['pm25', 'temperature', 'humidity'].forEach(k => { const v = parseFloat(j[k]); if (Number.isFinite(v)) cur[k] = v; });
+                    } catch { /* ไม่ใช่ JSON */ }
                 }
-                if (Number.isFinite(value)) { stopSim(); latest[nodeId] = value; refreshAverage(); }
+                if (Number.isFinite(cur.pm25)) { stopSim(); refreshAverage(); }
             });
             client.on('offline', () => setWaiting('ขาดการเชื่อมต่อ กำลังลองใหม่...'));
             client.on('error', () => setWaiting('เชื่อมต่อเซนเซอร์ไม่ได้ กำลังลองใหม่...'));
         }
+
         // ===== Aerolink API (แหล่งข้อมูลหลัก — ตั้งค่าที่ config.js) =====
         const API = window.PKRU_API || { enabled: false };
         let apiReal = false;
+
         function showNoData(text) {
             document.getElementById('pm25Value').textContent = '--';
             document.getElementById('statusText').textContent = text;
+            document.getElementById('statusLevel').textContent = '';
             document.getElementById('statusIcon').innerHTML = '';
-            const ring = document.getElementById('ringProgress');
-            ring.style.strokeDashoffset = 2 * Math.PI * 88;
-            ring.style.stroke = '#64748b';
+            document.getElementById('gaugeMarker').style.transform = 'translate(20px, 115px)';
             document.getElementById('pm25Quick').style.setProperty('--aqi-color', '#64748b');
+            document.getElementById('aqiMarker').classList.remove('on');
         }
+
         async function pollLandingApi() {
             try {
-                const rows = await API.latest({ fields: ['pm25'] });
+                const rows = await API.latest({ fields: ['pm25', 'temperature', 'humidity'] });
                 const values = rows.map(r => r.pm25).filter(Number.isFinite);
                 if (values.length) {
                     apiReal = true;
                     stopSim();
                     updatePM25Display(values.reduce((a, b) => a + b, 0) / values.length);
+                    updateStations(rows);
                 } else if (apiReal) {
                     showNoData('เซนเซอร์ไม่ได้ส่งข้อมูลใน 10 นาทีที่ผ่านมา');
                 }
@@ -464,21 +587,15 @@
                 if (apiReal) showNoData('เชื่อมต่อเซนเซอร์ไม่ได้ กำลังลองใหม่...');
             }
         }
+
         if (API.enabled) {
             pollLandingApi();
             setInterval(pollLandingApi, API.pollMs);
         } else {
             connectLanding();
         }
-
-        // ===== Scroll reveal =====
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) entry.target.classList.add('revealed');
-            });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll('.feature-card, .aqi-scale, .final-cta, .reveal-item, .about-card, .chart-wrapper, .team-card, .contact-box').forEach(el => observer.observe(el));
     </script>
+    <script src="pm25-forecast.js?v=20261004a"></script>
+    <script src="weather-forecast.js?v=20261004b"></script>
 </body>
 </html>

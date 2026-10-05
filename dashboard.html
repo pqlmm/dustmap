@@ -109,22 +109,31 @@
         .archive-source-note a { color: #818cf8; text-decoration: underline; }
         .archive-loading { padding: 32px 0; text-align: center; color: var(--text-muted, #94a3b8); font-size: .85rem; }
     </style>
+    <link rel="stylesheet" href="dashboard-redesign.css?v=20261005r4">
+    <script>(function(){try{var s=localStorage.getItem('pkru_aqm_theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)}catch(e){}})();</script>
     <script>try{if(localStorage.getItem('pkru_lang')==='en')document.documentElement.classList.add('i18n-pending')}catch(e){}</script>
     <style>.i18n-pending body{opacity:0;animation:i18nShow 0s 1.2s forwards}@keyframes i18nShow{to{opacity:1}}</style>
 </head>
 <body>
     <!-- Loading Screen -->
-    <div class="loading-screen" id="loadingScreen">
+    <div class="loading-screen rd-loading" id="loadingScreen" role="status" aria-live="polite">
+        <div class="rd-load-aurora" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="loading-content">
-            <div class="loading-ring">
-                <svg viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(129,140,248,0.15)" stroke-width="4"/>
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="url(#loadGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="80 200" class="loading-circle"/>
-                    <defs><linearGradient id="loadGrad" x1="0" y1="0" x2="100" y2="100"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs>
+            <div class="rd-load-gauge" aria-hidden="true">
+                <svg viewBox="0 0 220 130">
+                    <defs>
+                        <linearGradient id="rdLoadGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#22d3ee"/><stop offset="30%" stop-color="#10b981"/><stop offset="55%" stop-color="#eab308"/><stop offset="80%" stop-color="#f97316"/><stop offset="100%" stop-color="#f43f5e"/>
+                        </linearGradient>
+                    </defs>
+                    <path class="rd-load-track" d="M20 115 A90 90 0 0 1 200 115" pathLength="100"/>
+                    <path class="rd-load-arc" d="M20 115 A90 90 0 0 1 200 115" pathLength="100" stroke="url(#rdLoadGrad)"/>
                 </svg>
+                <img src="favicon.svg" alt="" width="52" height="52">
             </div>
             <span class="loading-text">PKRU Air Quality</span>
             <span class="loading-sub">กำลังโหลดข้อมูล...</span>
+            <div class="rd-load-dots" aria-hidden="true"><i></i><i></i><i></i></div>
         </div>
     </div>
 
@@ -292,18 +301,6 @@
                 </div>
 
                 <p>หน่วย µg/m³ · Air4Thai = สถานีกรมควบคุมมลพิษที่ใกล้ที่สุด · GISTDA และ Open-Meteo เป็นค่าประมาณจากดาวเทียม/แบบจำลอง ค่าอาจต่างกันตามตำแหน่งและวิธีวัด</p>
-            </div>
-
-            <a class="section-title pm-standard-link" href="https://epo03.pcd.go.th/th/news/detail/154265/" target="_blank" rel="noopener noreferrer" aria-label="เปิดมาตรฐาน PM2.5 ของกรมควบคุมมลพิษในแท็บใหม่">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                มาตรฐาน PM2.5 <span>↗</span>
-            </a>
-            <div class="legend-items">
-                <div class="legend-item"><span class="legend-color" style="background:#22d3ee"></span><span>ดีมาก (0–15.0)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>ดี (15.1–25.0)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#eab308"></span><span>ปานกลาง (25.1–37.5)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#f97316"></span><span>เริ่มมีผลกระทบ (37.6–75.0)</span></div>
-                <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>มีผลต่อสุขภาพ (>75.0)</span></div>
             </div>
         </div>
     </aside>
@@ -483,7 +480,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="i18n.js?v=20261001b"></script>
+    <script src="i18n.js?v=20261005r3"></script>
     <script src="config.js?v=20261002a"></script>
     <script src="api.js?v=20260930c"></script>
     <script src="app.js?v=20261001b"></script>
@@ -491,5 +488,6 @@
     <script src="history-mock.js?v=20260921f"></script>
     <script src="history-archive.js?v=20261001b"></script>
     <script src="mobile.js?v=20260921f"></script>
+    <script src="dashboard-redesign.js?v=20261005r3"></script>
 </body>
 </html>
