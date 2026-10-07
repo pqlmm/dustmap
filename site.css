@@ -186,7 +186,7 @@ button { font: inherit; color: inherit; }
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 30;
+    z-index: 1100; /* เหนือ Leaflet controls (1000) และทุก section */
     display: flex;
     gap: 4px;
     padding: 5px;

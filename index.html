@@ -13,12 +13,21 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="weather-forecast.css?v=20261005a">
-    <link rel="stylesheet" href="site.css?v=20261005r3">
+    <link rel="stylesheet" href="site.css?v=20261007a">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script>try{if(localStorage.getItem('pkru_lang')==='en')document.documentElement.classList.add('i18n-pending')}catch(e){}</script>
     <style>.i18n-pending body{opacity:0;animation:i18nShow 0s 1.2s forwards}@keyframes i18nShow{to{opacity:1}}</style>
 </head>
 <body>
+
+    <!-- Tubelight Navbar (อยู่นอก .hero เพื่อไม่ให้ถูกทับตอนเลื่อน) -->
+    <nav class="navpill" id="navpill" aria-label="เมนูหลัก">
+        <a href="#top" class="active">หน้าแรก</a>
+        <a href="#forecast">พยากรณ์</a>
+        <a href="#stations">จุดตรวจวัด</a>
+        <a href="#about">เกี่ยวกับ</a>
+        <a href="#team">ทีม</a>
+    </nav>
 
     <!-- ===== Hero (Aurora Background) ===== -->
     <header class="hero" id="top">
@@ -30,13 +39,6 @@
             <!-- Tubelight Navbar -->
             <div class="topnav">
                 <a href="#top" class="brand"><img src="favicon.svg" alt="" width="30" height="30"><span>PKRU Air Quality</span></a>
-                <nav class="navpill" id="navpill" aria-label="เมนูหลัก">
-                    <a href="#top" class="active">หน้าแรก</a>
-                    <a href="#forecast">พยากรณ์</a>
-                    <a href="#stations">จุดตรวจวัด</a>
-                    <a href="#about">เกี่ยวกับ</a>
-                    <a href="#team">ทีม</a>
-                </nav>
                 <div class="nav-actions">
                     <div class="lang-switch" role="group" aria-label="ภาษา">
                         <button type="button" data-lang-btn="th" aria-pressed="true" class="active">TH</button>
