@@ -537,8 +537,14 @@ body.detail-is-open .rd-map-legend { opacity: 0; pointer-events: none; }
     --rd-field: #f4f7f5;
 }
 .archive-overlay,
-:root[data-theme="dark"] .archive-overlay { background: rgba(3, 6, 12, .55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-:root[data-theme="light"] .archive-overlay { background: rgba(15, 23, 32, .28); }
+/* ไม่ใช้ backdrop-filter: blur — เบลอทับแผนที่ที่มีหมุดกะพริบ ต้องคำนวณใหม่ทุกเฟรม ทำให้กระตุก */
+:root[data-theme="dark"] .archive-overlay { background: rgba(3, 6, 12, .72); backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-theme="light"] .archive-overlay { background: rgba(15, 23, 32, .4); backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* ระหว่างเปิดหน้าต่างข้อมูลย้อนหลัง หยุดแอนิเมชันของแผนที่ด้านหลัง (มองไม่เห็นอยู่แล้ว) */
+body.archive-open .marker-outer::before,
+body.archive-open .leaflet-marker-pane * { animation-play-state: paused !important; }
+/* หน้าโหลดซ่อนแล้ว → หยุดแอนิเมชันด้วย */
+.loading-screen.hidden, .loading-screen.hidden * { animation: none !important; }
 .archive-modal {
     position: relative;
     overflow: hidden;
@@ -557,9 +563,8 @@ body.detail-is-open .rd-map-legend { opacity: 0; pointer-events: none; }
     width: 460px;
     height: 280px;
     border-radius: 50%;
-    background: #7ef0c0;
-    filter: blur(90px);
-    opacity: .14;
+    background: radial-gradient(closest-side, rgba(126, 240, 192, .14), rgba(126, 240, 192, 0));
+    transform: scale(1.6);
     pointer-events: none;
 }
 .archive-header { padding: 26px 28px 8px !important; border-bottom: 0 !important; }

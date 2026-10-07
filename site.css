@@ -55,6 +55,8 @@
     --ink-bad: #fda4af;
     --ink-indigo: #a5b4fc;
     --ink-discord: #a5b0ff;
+    --ink-line: #4ade80;
+    --ink-telegram: #7cc8f5;
 }
 :root[data-theme="light"] {
     color-scheme: light;
@@ -94,6 +96,8 @@
     --ink-bad: #be123c;
     --ink-indigo: #4f46e5;
     --ink-discord: #4752c4;
+    --ink-line: #058c3f;
+    --ink-telegram: #1877b0;
 }
 
 /* ---------- Base ---------- */
@@ -435,6 +439,13 @@ button { font: inherit; color: inherit; }
 .discord-tile .tile-row div { display: flex; flex-direction: column; gap: 4px; }
 .btn-discord { min-height: 46px; padding: 0 20px; border-radius: 12px; background: #5865f2; color: #fff; font-weight: 600; font-size: .9rem; }
 .btn-discord:hover { background: #4752c4; }
+/* ปุ่มแจ้งเตือน LINE / Telegram (สีเข้มพอให้ตัวอักษรขาวอ่านชัด) */
+.alert-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-line, .btn-telegram { min-height: 46px; padding: 0 20px; border-radius: 12px; color: #fff; font-weight: 600; font-size: .9rem; }
+.btn-line { background: #058c3f; }
+.btn-line:hover { background: #04742f; }
+.btn-telegram { background: #1877b0; }
+.btn-telegram:hover { background: #135f8d; }
 
 /* AQI scale */
 .aqi-card { margin-top: 16px; padding: 26px; }
@@ -454,26 +465,31 @@ button { font: inherit; color: inherit; }
 
 /* ---------- Animated Beam ---------- */
 .beam-flow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; }
-.beam-node { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 170px; text-align: center; }
+/* ทุกช่องสูงเท่ากัน ไอคอนอยู่บนสุด → ไอคอนเรียงเป็นแนวเดียวกับเส้น */
+.beam-node { display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 10px; width: 132px; min-height: 172px; text-align: center; }
 .beam-node strong { font-size: .95rem; }
 .beam-node span { color: var(--muted); font-size: .82rem; }
 .beam-icon { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border: 1px solid var(--line-2); border-radius: 20px; background: var(--surface); color: var(--text-2); }
 .beam-icon svg { width: 30px; height: 30px; }
-.beam-icon.hub { width: 84px; height: 84px; border-radius: 24px; border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc); box-shadow: 0 0 40px -6px var(--acc-glow); }
+.beam-icon.hub { margin: -6px 0; width: 84px; height: 84px; border-radius: 24px; border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc); box-shadow: 0 0 40px -6px var(--acc-glow); }
 .beam-line {
-    flex: 1 1 40px;
-    max-width: 120px;
+    flex: 1 1 24px;
+    max-width: 64px;
     height: 2px;
-    margin-bottom: 64px;
+    margin-bottom: 100px;
     background-image: linear-gradient(90deg, var(--tint-3) 0 40%, var(--acc) 50%, var(--tint-3) 60% 100%);
     background-size: 80px 2px;
     animation: beam 1.1s linear infinite;
 }
 @keyframes beam { to { background-position: 80px 0; } }
-.beam-outs { display: flex; flex-direction: column; gap: 12px; width: 220px; }
+.beam-outs { display: flex; flex-direction: column; gap: 8px; width: 230px; }
+.beam-out-label { margin-top: 4px; color: var(--muted); font: 500 .72rem var(--font-mono); letter-spacing: .08em; }
+.beam-out.is-static { cursor: default; }
 .beam-out { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 16px; background: var(--surface); font-size: .9rem; font-weight: 600; }
 .beam-out svg { width: 22px; height: 22px; color: var(--text-2); }
 .beam-out.discord svg { color: var(--ink-discord); }
+.beam-out.line svg { color: var(--ink-line); }
+.beam-out.telegram svg { color: var(--ink-telegram); }
 
 /* ---------- History chart ---------- */
 .chart-card { padding: 28px; display: flex; flex-direction: column; gap: 22px; }
@@ -552,7 +568,11 @@ button { font: inherit; color: inherit; }
 .scope-note { margin: 18px 0 0; color: var(--muted); font-size: .88rem; }
 
 /* ---------- Team ---------- */
-.team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+/* อาจารย์ที่ปรึกษาอยู่แถวบนตรงกลาง ผู้พัฒนา 4 คนเรียงแถวล่าง (จอเล็ก 2 คอลัมน์ / มือถือ 1 คอลัมน์) */
+.team-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.team-card.lead { grid-column: 1 / -1; justify-self: center; width: min(100%, 380px); }
+@media (max-width: 1100px) { .team-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .team-grid { grid-template-columns: 1fr; } }
 .team-card { padding: 26px; display: flex; flex-direction: column; gap: 14px; transition: transform .25s ease, border-color .25s ease; }
 .team-card:hover { transform: translateY(-4px); border-color: var(--line-2); }
 .team-card.lead { border-color: var(--acc-line); background: linear-gradient(180deg, var(--acc-soft), var(--surface) 70%); }
@@ -627,12 +647,16 @@ button { font: inherit; color: inherit; }
 .fc-photo, .fc-now { border-radius: 18px; }
 
 /* ---------- Responsive ---------- */
+/* จอกลาง: ช่องแสดงผล/แจ้งเตือนขึ้นแถวใหม่ → ซ่อนเส้นที่ห้อยท้ายแถวบน */
+@media (max-width: 1200px) { .beam-line:has(+ .beam-outs) { display: none; } }
 @media (max-width: 980px) {
     .navpill { display: none; }
     .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .span4 { grid-column: span 2; }
     .beam-line { display: none; }
     .beam-flow { gap: 24px; }
+    .beam-node { min-height: 0; }
+    .beam-outs { width: min(100%, 320px); }
 }
 @media (max-width: 760px) {
     body { padding-bottom: 96px; }

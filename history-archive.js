@@ -501,8 +501,13 @@
         ov.hidden = false;
         requestAnimationFrame(() => ov.classList.add('active'));
         document.body.classList.add('archive-open');
-        if (!st.result) run();
-        else if (st.result.rows) renderCharts();
+        // รอให้แอนิเมชันเปิดหน้าต่างเล่นจบก่อน (~0.2 วิ) ค่อยโหลด/วาดกราฟ ไม่ให้แอนิเมชันสะดุด
+        if (!st.result) $('archiveCharts').innerHTML = '<div class="archive-loading">กำลังโหลดข้อมูล…</div>';
+        setTimeout(() => {
+            if (ov.hidden) return;
+            if (!st.result) run();
+            else if (st.result.rows) renderCharts();
+        }, 220);
         setTimeout(() => $('archiveClose').focus(), 50);
     }
     function close() {

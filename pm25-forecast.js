@@ -1,5 +1,7 @@
-// ===== PKRU Air Quality — แบบจำลองพยากรณ์ PM2.5 (คำนวณในเบราว์เซอร์ ไม่ต้องแก้เซิร์ฟเวอร์) =====
-// ข้อมูลเข้า: ค่าย้อนหลังจากเซนเซอร์ (InfluxDB ผ่าน /api/history) + PM2.5 จากแบบจำลอง CAMS ของ Open-Meteo
+// ===== PKRU Air Quality — แบบจำลองพยากรณ์ PM2.5 / อุณหภูมิ / ความชื้น (คำนวณในเบราว์เซอร์ ไม่ต้องแก้เซิร์ฟเวอร์) =====
+// ข้อมูลเข้า: ค่าย้อนหลังจากเซนเซอร์ (InfluxDB ผ่าน /api/history)
+//   (รองรับ PM2.5 จาก Open-Meteo เป็นตัวเลือกเสริม — หน้าเว็บตอนนี้ไม่ได้ส่งมา จึงใช้ข้อมูลเซนเซอร์อย่างเดียว)
+// เลือกค่าที่จะพยากรณ์ด้วย field: 'pm25' | 'temperature' | 'humidity'
 //
 // วิธีคิด (อธิบายได้ ตรวจสอบได้):
 //   1) รูปแบบรายชั่วโมงของวัน  — ค่ามัธยฐาน PM2.5 ของแต่ละชั่วโมง (00:00–23:00) จากข้อมูลจริง 14 วันล่าสุด
@@ -19,6 +21,15 @@
     const fin = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+    // ช่วงค่าที่ยอมรับได้ (ตัดค่าผิดพลาดจากเซนเซอร์) และความกว้างช่วงคาดการณ์เริ่มต้นเมื่อยังทดสอบย้อนหลังไม่ได้
+    const FIELDS = {
+        pm25: { min: 0, max: 1000, spread: v => 0.35 * v + 2 },
+        temperature: { min: 0, max: 60, spread: () => 1.5 },
+        humidity: { min: 0, max: 100, spread: () => 8 },
+    };
+    const fieldInfo = f => FIELDS[f] || FIELDS.pm25;
+    const clampField = (f, v) => clamp(v, fieldInfo(f).min, fieldInfo(f).max);
+
     function median(arr) {
         const a = arr.filter(fin).sort((x, y) => x - y);
         if (!a.length) return null;
@@ -27,13 +38,15 @@
     }
 
     // ค่าเฉลี่ยทั้งวิทยาเขตรายชั่วโมง: เฉลี่ยในแต่ละจุดก่อน แล้วเฉลี่ยข้ามจุด (จุดที่ส่งถี่ไม่ได้น้ำหนักมากกว่า)
-    function campusHourly(rows) {
+    function campusHourly(rows, field = 'pm25') {
+        const { min, max } = fieldInfo(field);
         const perNode = new Map(); // key `${node}|${hour}` → [sum, n]
         (rows || []).forEach(r => {
-            if (!fin(r.pm25) || !fin(r.t) || r.pm25 < 0 || r.pm25 > 1000) return;
+            const v = r[field];
+            if (!fin(v) || !fin(r.t) || v < min || v > max) return;
             const k = `${r.nodeId || 'x'}|${floorHour(r.t)}`;
             const cur = perNode.get(k) || [0, 0];
-            cur[0] += r.pm25; cur[1] += 1;
+            cur[0] += v; cur[1] += 1;
             perNode.set(k, cur);
         });
         const perHour = new Map(); // hour → [sum of node means, nodes]
@@ -105,7 +118,7 @@
     function omWeight(h) { return 0.25 + 0.5 * Math.min(1, h / 72); }
 
     // พยากรณ์จากจุดเริ่ม (origin) ไป H ชั่วโมง โดยใช้ข้อมูลก่อน origin เท่านั้น
-    function forecastFrom(obs, om, origin, H, fixed) {
+    function forecastFrom(obs, om, origin, H, fixed, field = 'pm25') {
         const profile = fixed ? fixed.profile : hourProfile(obs, origin + HOUR);
         const tau = fixed ? fixed.tau : decayTau(obs, profile, origin + HOUR);
         const ratio = fixed ? fixed.ratio : omRatio(obs, om, origin + HOUR);
@@ -120,20 +133,20 @@
             if (fin(local) && fin(omc)) { const w = omWeight(h); v = (1 - w) * local + w * omc; src = 'blend'; }
             else if (fin(local)) { v = local; src = 'local'; }
             else if (fin(omc)) { v = omc; src = 'om'; }
-            out.push({ t, h, v: fin(v) ? Math.max(0, v) : null, src });
+            out.push({ t, h, v: fin(v) ? clampField(field, v) : null, src });
         }
         return { points: out, profile, tau, ratio };
     }
 
     // ทดสอบย้อนหลัง: จุดเริ่มทุก 6 ชั่วโมงในช่วง 7 วันก่อน (ต้องมีค่าจริงให้เทียบ)
-    function backtest(obs, om, now) {
+    function backtest(obs, om, now, field = 'pm25') {
         const errs = { short: [], long: [] }; // 1–6 ชม., 7–24 ชม.
         const absErr = [], naiveErr = [];
         let origins = 0;
         for (let o = floorHour(now) - 7 * 24 * HOUR; o <= floorHour(now) - 6 * HOUR; o += 6 * HOUR) {
             const last = obs.get(o);
             if (!fin(last)) continue;
-            const f = forecastFrom(obs, om, o, 24);
+            const f = forecastFrom(obs, om, o, 24, null, field);
             if (!f.profile && f.ratio === null) continue;
             let used = false;
             f.points.forEach(p => {
@@ -163,12 +176,13 @@
      * สร้างพยากรณ์
      * @param {object} p
      * @param {Array<{nodeId,t,pm25}>} p.rows   ข้อมูลย้อนหลังจากเซนเซอร์ (+ ค่าล่าสุดก็ได้)
-     * @param {Array<{t,v}>} p.om               PM2.5 รายชั่วโมงจาก Open-Meteo (รวมอดีตเพื่อใช้ปรับสเกล)
+     * @param {string} p.field                   'pm25' (ค่าเริ่มต้น) | 'temperature' | 'humidity'
+     * @param {Array<{t,v}>} p.om               (ไม่บังคับ) ค่ารายชั่วโมงจากแหล่งภายนอก เพื่อผสม — ไม่ส่ง = ใช้เซนเซอร์อย่างเดียว
      * @param {number} p.now                     เวลาปัจจุบัน (ms)
      * @param {number} p.hours                   จำนวนชั่วโมงที่ต้องการพยากรณ์
      */
-    function build({ rows = [], om = [], now = Date.now(), hours = 120 } = {}) {
-        const obs = campusHourly(rows);
+    function build({ rows = [], om = [], now = Date.now(), hours = 120, field = 'pm25' } = {}) {
+        const obs = campusHourly(rows, field);
         const omMap = new Map();
         om.forEach(p => { if (fin(p.v) && fin(p.t)) omMap.set(floorHour(p.t), p.v); });
 
@@ -181,8 +195,8 @@
             if (fin(v)) { origin = nowH - k * HOUR; lastObs = { t: origin, v }; break; }
         }
 
-        const f = forecastFrom(obs, omMap, origin, hours + (nowH - origin) / HOUR);
-        const bt = obs.size >= 72 ? backtest(obs, omMap, now) : null;
+        const f = forecastFrom(obs, omMap, origin, hours + (nowH - origin) / HOUR, null, field);
+        const bt = obs.size >= 72 ? backtest(obs, omMap, now, field) : null;
         const sigma = h => {
             if (bt && fin(bt.rmseShort) && fin(bt.rmseLong)) {
                 if (h <= 6) return bt.rmseShort;
@@ -195,8 +209,8 @@
             .filter(p => p.t > nowH - HOUR && fin(p.v))
             .map(p => {
                 const s = sigma(p.h);
-                const spread = fin(s) ? 1.28 * s : 0.35 * p.v + 2; // ช่วงคาดการณ์ ~80%
-                return { t: p.t, v: p.v, lo: Math.max(0, p.v - spread), hi: p.v + spread, src: p.src };
+                const spread = fin(s) ? 1.28 * s : fieldInfo(field).spread(p.v); // ช่วงคาดการณ์ ~80%
+                return { t: p.t, v: p.v, lo: clampField(field, p.v - spread), hi: clampField(field, p.v + spread), src: p.src };
             });
 
         const sources = new Set(points.map(p => p.src));
@@ -204,6 +218,7 @@
             : sources.has('local') ? 'local' : sources.has('om') ? 'om' : null;
 
         return {
+            field,
             method,                  // 'blend' | 'local' | 'om' | null
             points,                  // [{t, v, lo, hi, src}] ทุกชั่วโมงหลังจุดเริ่ม
             observed: obs,           // Map<hourMs, ค่าเฉลี่ยทั้งวิทยาเขต>

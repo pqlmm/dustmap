@@ -1326,14 +1326,35 @@ function disconnectMQTT() {
 const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v3';
 try { localStorage.removeItem('pkru-air-quality-history-v1'); localStorage.removeItem('pkru-air-quality-history-v2'); } catch { /* ignore */ }
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+// เก็บ 1 จุดต่อสถานีทุก 10 นาที — ข้อมูลละเอียดดึงจาก API ได้อยู่แล้ว ส่วนนี้เป็นแค่สำรองตอน API ล่ม
+// (เดิมเก็บทุกครั้งที่มีค่าเข้า → ข้อมูลโตจนเต็ม ~5MB และต้องอ่าน/เขียนทั้งก้อนทุกครั้ง ทำให้หน้าเว็บกระตุก)
+const HISTORY_INTERVAL_MS = 10 * 60 * 1000;
+let historyCache = null; // อ่านจาก localStorage ครั้งเดียว แล้วใช้ค่าในหน่วยความจำ
+
+// ตัดแถวที่เก่าเกิน 30 วัน และเหลือไม่เกิน 1 แถวต่อสถานีต่อ 10 นาที
+function thinHistory(rows) {
+    const cutoff = Date.now() - HISTORY_RETENTION_MS;
+    const lastAt = {};
+    return rows.filter(row => {
+        const t = new Date(row.timestamp).getTime();
+        if (!(t >= cutoff)) return false;
+        if (lastAt[row.nodeId] !== undefined && t - lastAt[row.nodeId] < HISTORY_INTERVAL_MS) return false;
+        lastAt[row.nodeId] = t;
+        return true;
+    });
+}
 
 function loadHistory() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
-        return Array.isArray(saved) ? saved : [];
-    } catch {
-        return [];
+    if (!historyCache) {
+        try {
+            const saved = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
+            historyCache = Array.isArray(saved) ? thinHistory(saved) : [];
+            if (Array.isArray(saved) && historyCache.length < saved.length) saveHistory(historyCache);
+        } catch {
+            historyCache = [];
+        }
     }
+    return historyCache.slice();
 }
 
 function saveHistory(rows) {
@@ -1343,25 +1364,23 @@ function saveHistory(rows) {
 function recordHistory(node) {
     if (!node || node.data.pm25 === null || node.data.temperature === null || node.data.humidity === null) return;
     const now = Date.now();
-    const rows = loadHistory().filter(row => now - new Date(row.timestamp).getTime() <= HISTORY_RETENTION_MS);
-    const last = rows[rows.length - 1];
+    const rows = loadHistory();
 
-    // รวมค่าที่เข้ามาในช่วง 20 วินาทีเดียวกันเป็นหนึ่งจุด เพื่อให้กราฟอ่านง่าย
-    if (last && last.nodeId === node.id && now - new Date(last.timestamp).getTime() < 20000) {
-        last.timestamp = new Date(now).toISOString();
-        last.pm25 = node.data.pm25;
-        last.temperature = node.data.temperature;
-        last.humidity = node.data.humidity;
-    } else {
-        rows.push({
-            nodeId: node.id,
-            timestamp: new Date(now).toISOString(),
-            pm25: node.data.pm25,
-            temperature: node.data.temperature,
-            humidity: node.data.humidity,
-        });
+    // สถานีนี้เพิ่งบันทึกไปไม่ถึง 10 นาที → ไม่ต้องบันทึกซ้ำ (ไม่ต้องเขียน localStorage)
+    for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].nodeId !== node.id) continue;
+        if (now - new Date(rows[i].timestamp).getTime() < HISTORY_INTERVAL_MS) return;
+        break;
     }
-    saveHistory(rows);
+    rows.push({
+        nodeId: node.id,
+        timestamp: new Date(now).toISOString(),
+        pm25: node.data.pm25,
+        temperature: node.data.temperature,
+        humidity: node.data.humidity,
+    });
+    historyCache = rows.filter(row => now - new Date(row.timestamp).getTime() <= HISTORY_RETENTION_MS);
+    saveHistory(historyCache);
 }
 
 function getHistoryRows(nodeId, days = state.historyRange) {
