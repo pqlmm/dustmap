@@ -9,7 +9,7 @@
 // ⚠️ API อนุญาต CORS เฉพาะ https://pqlmm.github.io — เปิดไฟล์ตรงๆ (file://) จะดึงข้อมูลไม่ได้
 // ตั้ง baseUrl เป็น '' เพื่อปิดการใช้ API (จะกลับไปใช้ MQTT ด้านล่าง)
 window.PKRU_API_CONFIG = {
-    baseUrl: 'https://flyer-straight-furniture-attempted.trycloudflare.com',
+    baseUrl: 'https://watching-postcards-deutsche-refinance.trycloudflare.com/',
     pollMs: 30000,          // ดึงค่าล่าสุดทุก 30 วินาที (เซนเซอร์ส่งทุก ~30 วินาทีอยู่แล้ว)
     timeoutMs: 15000,
     staleMinutes: 10,       // ค่าที่เก่ากว่านี้ถือว่า "ไม่ได้อัปเดต"
