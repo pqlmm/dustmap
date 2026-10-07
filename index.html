@@ -250,7 +250,7 @@
                         <div>
                             <span class="eyebrow">ข้อมูลย้อนหลัง</span>
                             <h2>สถิติค่า PM2.5 รายสัปดาห์</h2>
-                            <p id="weeklyNote">ย้อนหลัง 7 วัน (ข้อมูลตัวอย่าง)</p>
+                            <p id="weeklyNote">กำลังรอข้อมูลย้อนหลังจาก InfluxDB…</p>
                         </div>
                         <div class="chart-legend"><span><i></i>PM2.5</span><span><i class="watch"></i>เกณฑ์เฝ้าระวัง (37.5)</span></div>
                     </div>
@@ -260,17 +260,17 @@
                             <line class="grid" x1="0" y1="60" x2="700" y2="60"/>
                             <line class="threshold" id="weeklyThreshold" x1="0" y1="120" x2="700" y2="120"/>
                             <line class="grid" x1="0" y1="180" x2="700" y2="180"/>
-                            <path id="weeklyArea" d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125 L700,240 L0,240 Z" fill="url(#chartArea)"/>
-                            <path class="line" id="weeklyLine" d="M0,180 C50,170 100,155 150,140 C200,125 250,100 300,115 C350,130 400,90 450,105 C500,120 550,145 600,130 C650,115 700,125 700,125"/>
+                            <path id="weeklyArea" d="" fill="url(#chartArea)"/>
+                            <path class="line" id="weeklyLine" d=""/>
                         </svg>
                         <div class="chart-dots" id="weeklyDots" aria-hidden="true"></div>
                     </div>
                     <div class="chart-x" id="weeklyDays" aria-hidden="true"><span>จ.</span><span>อ.</span><span>พ.</span><span>พฤ.</span><span>ศ.</span><span>ส.</span><span>อา.</span></div>
                     <div class="stat-row">
-                        <div class="stat"><b id="weeklyMin" style="color: var(--ink-good)">18.2</b><span>ค่าต่ำสุด</span></div>
-                        <div class="stat"><b id="weeklyAvg">27.4</b><span>ค่าเฉลี่ย</span></div>
-                        <div class="stat"><b id="weeklyMax" style="color: var(--ink-bad)">41.6</b><span>ค่าสูงสุด</span></div>
-                        <div class="stat"><b id="weeklyOver" style="color: var(--ink-mod)">1 วัน</b><span>เกินเกณฑ์</span></div>
+                        <div class="stat"><b id="weeklyMin" style="color: var(--ink-good)">--</b><span>ค่าต่ำสุด</span></div>
+                        <div class="stat"><b id="weeklyAvg">--</b><span>ค่าเฉลี่ย</span></div>
+                        <div class="stat"><b id="weeklyMax" style="color: var(--ink-bad)">--</b><span>ค่าสูงสุด</span></div>
+                        <div class="stat"><b id="weeklyOver" style="color: var(--ink-mod)">--</b><span>เกินเกณฑ์</span></div>
                     </div>
                 </div>
             </div>
@@ -399,7 +399,7 @@
 
     <script src="i18n.js?v=20261005r4"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="config.js?v=20261005a"></script>
+    <script src="config.js?v=20261007a"></script>
     <script src="api.js?v=20260930c"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="site.js?v=20261005r2"></script>
@@ -475,7 +475,8 @@
         const MQTT_CONFIG = window.PKRU_MQTT_CONFIG;
 
         // ข้อมูลจำลองระหว่างรอข้อมูลจริง (หยุดเองเมื่อมีข้อมูลจริงเข้ามา)
-        const USE_SIMULATION = true;
+        // 2026-10-07: ปิดไว้ — แสดงเฉพาะข้อมูลจริงจาก API
+        const USE_SIMULATION = false;
         let simTimer = null;
         // ค่าจำลองรายจุด (แบบเดียวกับแดชบอร์ด) — หยุดเองเมื่อมีข้อมูลจริง
         const simNodes = ['node2', 'node3', 'node4'].map(id => ({
@@ -598,7 +599,7 @@
             connectLanding();
         }
     </script>
-    <script src="weekly-history.js?v=20261005r1"></script>
+    <script src="weekly-history.js?v=20261007a"></script>
     <script src="pm25-forecast.js?v=20261004a"></script>
     <script src="weather-forecast.js?v=20261004b"></script>
 </body>

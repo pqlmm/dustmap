@@ -47,7 +47,8 @@ function getFacultyIcon(nodeId) {
 // ===== Simulation =====
 // เปิดโหมดจำลองไว้ระหว่างรอข้อมูลจริง (จาก Grafana / MQTT)
 // โหมดจำลองจะหยุดเองทันทีที่มีข้อมูลจริงเข้ามา — ถ้าไม่ต้องการข้อมูลจำลองเลย ให้ตั้งเป็น false
-const USE_SIMULATION = true;
+// 2026-10-07: ปิดไว้ — แสดงเฉพาะข้อมูลจริงจาก API (ระหว่างรอจะขึ้น "--")
+const USE_SIMULATION = false;
 let simulationInterval = null;
 
 function randomInRange(min, max) {
@@ -1321,9 +1322,9 @@ function disconnectMQTT() {
 
 // ===== Historical data =====
 // เก็บค่าในเบราว์เซอร์เพื่อให้กราฟและ CSV แสดงข้อมูลที่ได้รับจริง
-// v2: เริ่มเก็บใหม่เมื่อเปลี่ยนเป็นข้อมูลจริงจาก MQTT (ข้อมูล v1 เป็นข้อมูลจำลอง)
-const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v2';
-try { localStorage.removeItem('pkru-air-quality-history-v1'); } catch { /* ignore */ }
+// v3: เริ่มเก็บใหม่หลังปิดโหมดจำลอง (ข้อมูล v1/v2 มีค่าจำลองปนอยู่)
+const HISTORY_STORAGE_KEY = 'pkru-air-quality-history-v3';
+try { localStorage.removeItem('pkru-air-quality-history-v1'); localStorage.removeItem('pkru-air-quality-history-v2'); } catch { /* ignore */ }
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function loadHistory() {

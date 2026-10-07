@@ -1,7 +1,7 @@
 // ===== PKRU Air Quality — กราฟ "สถิติค่า PM2.5 รายสัปดาห์" (หน้าแรก) =====
 // ดึงค่าย้อนหลัง 7 วันจาก InfluxDB ผ่าน Aerolink API (PKRU_API.history → /api/history)
 // แล้วคิด "ค่าเฉลี่ยรายวันของทุกจุดตรวจวัด" ตามวันที่เวลาไทย (Asia/Bangkok)
-// ถ้า API ปิดอยู่ / ดึงไม่ได้ / ยังไม่มีข้อมูล → คงข้อมูลตัวอย่างไว้ และบอกเหตุผลใต้หัวข้อ
+// ถ้า API ปิดอยู่ / ดึงไม่ได้ / ยังไม่มีข้อมูล → กราฟว่าง ค่าเป็น "--" และบอกเหตุผลใต้หัวข้อ (ไม่ใช้ข้อมูลตัวอย่าง)
 (function () {
     'use strict';
     const API = window.PKRU_API;
@@ -17,6 +17,17 @@
     const dayFull = d => d.toLocaleDateString('th-TH', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' });
 
     function setNote(text) { $('weeklyNote').textContent = text; }
+    let hasRealData = false;
+
+    // ยังไม่มีข้อมูลจริง → ล้างกราฟ แสดง "--"
+    function showEmpty(text) {
+        if (hasRealData) { setNote(text + ' · แสดงข้อมูลล่าสุดที่ดึงได้'); return; }
+        $('weeklyLine').setAttribute('d', '');
+        $('weeklyArea').setAttribute('d', '');
+        $('weeklyDots').innerHTML = '';
+        ['weeklyMin', 'weeklyAvg', 'weeklyMax', 'weeklyOver'].forEach(id => { $(id).textContent = '--'; });
+        setNote(text);
+    }
 
     // เส้นโค้งผ่านทุกจุด (Catmull-Rom → Bézier)
     function smoothPath(pts) {
@@ -67,7 +78,7 @@
     }
 
     async function load() {
-        if (!API || !API.enabled) return;            // ไม่มี API → ใช้ข้อมูลตัวอย่างเดิม
+        if (!API || !API.enabled) { showEmpty('ยังไม่ได้ตั้งค่า API — ไม่มีข้อมูลย้อนหลัง'); return; }
         card.classList.add('is-loading');
         setNote('กำลังดึงข้อมูลย้อนหลังจาก InfluxDB…');
         try {
@@ -89,13 +100,14 @@
             days.forEach(d => { if (d.n) d.avg = d.sum / d.n; });
 
             if (!days.some(d => d.avg !== null)) {
-                setNote('ยังไม่มีข้อมูลใน InfluxDB — แสดงข้อมูลตัวอย่าง');
+                showEmpty('ยังไม่มีข้อมูลใน InfluxDB — รอข้อมูลจากเซนเซอร์');
                 return;
             }
             render(days);
+            hasRealData = true;
         } catch (err) {
             console.warn('[weekly] ดึงข้อมูลย้อนหลังไม่ได้:', err && (err.message || err));
-            setNote('ดึงข้อมูลจาก InfluxDB ไม่ได้ — แสดงข้อมูลตัวอย่าง');
+            showEmpty('ดึงข้อมูลจาก InfluxDB ไม่ได้ — รอเซิร์ฟเวอร์ API');
         } finally {
             card.classList.remove('is-loading');
         }
