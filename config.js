@@ -8,6 +8,7 @@
 //      (เว็บจะจำค่านี้ไว้ในเบราว์เซอร์นั้น — ล้างค่าได้ด้วย ?api=reset)
 // ⚠️ API อนุญาต CORS เฉพาะ https://pqlmm.github.io — เปิดไฟล์ตรงๆ (file://) จะดึงข้อมูลไม่ได้
 // ตั้ง baseUrl เป็น '' เพื่อปิดการใช้ API (จะกลับไปใช้ MQTT ด้านล่าง)
+// I palm Nahee
 window.PKRU_API_CONFIG = {
     baseUrl: 'https://ellen-athletics-things-jessica.trycloudflare.com/',
     pollMs: 30000,          // ดึงค่าล่าสุดทุก 30 วินาที (เซนเซอร์ส่งทุก ~30 วินาทีอยู่แล้ว)
