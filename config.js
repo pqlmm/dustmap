@@ -10,7 +10,7 @@
 // ตั้ง baseUrl เป็น '' เพื่อปิดการใช้ API (จะกลับไปใช้ MQTT ด้านล่าง)
 // I palm Nahee
 window.PKRU_API_CONFIG = {
-    baseUrl: 'https://hans-relation-committees-assurance.trycloudflare.com',
+    baseUrl: ' https://antarctica-frost-offering-texture.trycloudflare.com',
     pollMs: 30000,          // ดึงค่าล่าสุดทุก 30 วินาที (เซนเซอร์ส่งทุก ~30 วินาทีอยู่แล้ว)
     timeoutMs: 15000,
     staleMinutes: 10,       // ค่าที่เก่ากว่านี้ถือว่า "ไม่ได้อัปเดต"
